@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     wavespeed_sdk_timeout_seconds: float = 36000.0
     wavespeed_sdk_poll_interval_seconds: float = 1.0
     wavespeed_sdk_enable_sync_mode: bool = False
+    allow_provider_live_checks: bool = False
+    provider_smoke_test_model: str = "wavespeed-ai/z-image/turbo"
+    provider_smoke_test_timeout_seconds: float = 120.0
     cors_allowed_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",

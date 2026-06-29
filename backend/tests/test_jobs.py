@@ -201,12 +201,33 @@ def test_job_input_and_provider_summary_do_not_store_api_key(job_app) -> None:
         )
         assert len(provider_runs) == len(JOB_CASES)
         for provider_run in provider_runs:
-            assert set(provider_run.request_summary_json or {}) <= {"job_type", "model"}
+            assert set(provider_run.request_summary_json or {}) <= {
+                "job_type",
+                "model",
+                "provider_mode",
+            }
             assert "worker-only-secret" not in str(provider_run.request_summary_json)
+            assert provider_run.started_at is not None
+            assert provider_run.completed_at is not None
+            assert provider_run.duration_ms is not None
+            assert provider_run.duration_ms >= 0
+            assert provider_run.provider_mode in {"sdk", "local"}
+            assert set(provider_run.response_summary_json or {}) == {
+                "result_available",
+                "output_count",
+            }
+            summaries = str((provider_run.request_summary_json, provider_run.response_summary_json))
+            assert "deterministic generated script" not in summaries.casefold()
+            assert "https://example.test" not in summaries
+            if provider_run.provider == "wavespeed":
+                assert provider_run.sdk_version is not None
+            else:
+                assert provider_run.provider == "local_media"
+                assert provider_run.sdk_version is None
 
 
 def test_retryable_failure_increments_attempt_and_waits_for_recovery(job_app, monkeypatch) -> None:
-    client, _application = job_app
+    client, application = job_app
 
     def fail_generation(_api_key: str, _payload: ScriptRequest, **_kwargs) -> ScriptResponse:
         raise ProviderError("Provider temporarily unavailable.")
@@ -222,6 +243,16 @@ def test_retryable_failure_increments_attempt_and_waits_for_recovery(job_app, mo
         "code": "provider_error",
         "message": "Provider temporarily unavailable.",
     }
+    with application.state.session_factory() as session:
+        provider_run = session.scalar(
+            select(ProviderRun).where(ProviderRun.job_id == accepted["job_id"])
+        )
+        assert provider_run is not None
+        assert provider_run.status == "failed"
+        assert provider_run.completed_at is not None
+        assert provider_run.duration_ms is not None
+        assert provider_run.error_code == "provider_error"
+        assert provider_run.error_message == "Provider temporarily unavailable."
 
 
 def test_exhausted_retryable_failure_becomes_failed(job_app, monkeypatch) -> None:

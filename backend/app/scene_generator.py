@@ -1,7 +1,8 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from textwrap import dedent
-from typing import Any
+from threading import Lock
+from typing import Any, Callable
 
 import httpx
 from fastapi import HTTPException
@@ -211,27 +212,45 @@ def generate_scene_sequence(
     payload: SceneSequenceRequest,
     *,
     provider_client: WaveSpeedProviderClient | None = None,
+    provider_client_factory: Callable[[], WaveSpeedProviderClient] | None = None,
     settings: Settings | None = None,
 ) -> SceneSequenceResponse:
     settings = settings or get_settings()
-    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
     planned_scenes = _generate_scene_plan(api_key, payload)
     scene_count = len(planned_scenes)
+    shared_client_lock = Lock()
+
+    def create_render_client() -> WaveSpeedProviderClient:
+        if provider_client is not None:
+            return provider_client
+        factory = provider_client_factory or (
+            lambda: create_wavespeed_provider_client(settings, api_key=api_key)
+        )
+        return factory()
 
     def render_scene(scene_input: tuple[int, PlannedScene]) -> GeneratedScene:
         scene_number, planned_scene = scene_input
-        image = generate_art_style_image(
-            api_key,
-            ArtStyleRequest(
-                prompt=planned_scene.image_prompt,
-                style_name=payload.style_name,
-                art_direction=payload.art_direction,
-                model=payload.model,
-                enable_safety_checker=payload.enable_safety_checker,
-            ),
-            provider_client=provider_client,
-            settings=settings,
-        )
+        render_client = create_render_client()
+
+        def generate_image():
+            return generate_art_style_image(
+                api_key,
+                ArtStyleRequest(
+                    prompt=planned_scene.image_prompt,
+                    style_name=payload.style_name,
+                    art_direction=payload.art_direction,
+                    model=payload.model,
+                    enable_safety_checker=payload.enable_safety_checker,
+                ),
+                provider_client=render_client,
+                settings=settings,
+            )
+
+        if provider_client is None:
+            image = generate_image()
+        else:
+            with shared_client_lock:
+                image = generate_image()
         return GeneratedScene(
             scene_number=scene_number,
             narration=planned_scene.narration,

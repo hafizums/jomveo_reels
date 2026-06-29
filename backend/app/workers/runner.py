@@ -13,6 +13,11 @@ from backend.app.db.session import (
     create_database_engine,
     create_session_factory,
 )
+from backend.app.infrastructure.providers.observability import (
+    safe_provider_request_summary,
+    safe_provider_response_summary,
+)
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
 from backend.app.repositories.jobs import JobRepository
 from backend.app.repositories.provider_runs import ProviderRunRepository
 
@@ -104,14 +109,25 @@ def execute_job(
             definition = get_job_definition(job.type)
             progress_total = _initial_progress_total(job.type, job.input_json)
             job_repository.set_progress_total(job, progress_total)
+            if definition.provider == "wavespeed":
+                metadata_client = create_wavespeed_provider_client(settings)
+                provider_mode = metadata_client.provider_mode
+                sdk_version = metadata_client.sdk_version()
+            else:
+                provider_mode = "local"
+                sdk_version = None
+            model = str(job.input_json.get("model") or "") or None
             provider_run = ProviderRunRepository(session).create(
                 job_id=job.id,
                 provider=definition.provider,
-                model=str(job.input_json.get("model") or "") or None,
-                request_summary={
-                    "job_type": job.type,
-                    "model": job.input_json.get("model"),
-                },
+                model=model,
+                provider_mode=provider_mode,
+                sdk_version=sdk_version,
+                request_summary=safe_provider_request_summary(
+                    job.type,
+                    model,
+                    provider_mode,
+                ),
             )
             provider_run_id = provider_run.id
             input_json = dict(job.input_json)
@@ -137,7 +153,7 @@ def execute_job(
             if provider_run is not None:
                 provider_run_repository.mark_completed(
                     provider_run,
-                    {"result_available": True},
+                    safe_provider_response_summary(result),
                 )
             session.commit()
     except AppError as exc:

@@ -30,6 +30,9 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.wavespeed_sdk_timeout_seconds == 36000
     assert settings.wavespeed_sdk_poll_interval_seconds == 1
     assert settings.wavespeed_sdk_enable_sync_mode is False
+    assert settings.allow_provider_live_checks is False
+    assert settings.provider_smoke_test_model == "wavespeed-ai/z-image/turbo"
+    assert settings.provider_smoke_test_timeout_seconds == 120
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:
