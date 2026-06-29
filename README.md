@@ -154,3 +154,19 @@ The storyboard planner also writes a constrained motion prompt for every image. 
 For script generation, the selected language is passed into the prompt so the model writes the output in that language. For voiceovers, the selected gender and style act as app-level selectors that map to valid ElevenLabs `voice_id` values from WaveSpeed's official voice list. For background music, the presets are designed for original non-vocal underscore tracks; review final usage rights and platform terms before commercial publishing. For caption rendering, the output video is written under `backend/generated/captions` and served back through `/generated/captions/...`.
 
 If you still see `403 Forbidden`, that is usually account-side rather than code-side. Make sure your WaveSpeed key is active and your account is allowed to use the requested model or LLM endpoint.
+## Backend quality checks
+
+Copy `backend/.env.example` to `backend/.env` and set `WAVESPEED_API_KEY` for
+provider-backed endpoints. Start the API from the repository root:
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+Run the backend quality checks with:
+
+```bash
+python -m pytest backend/tests
+python -m ruff check backend/app backend/tests
+python -m ruff format --check backend/app backend/tests
+```

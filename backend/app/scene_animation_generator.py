@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
 
-
 WAN_I2V_MODEL = "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast"
 DEFAULT_NEGATIVE_PROMPT = (
     "blurry, low quality, distorted anatomy, warped face, duplicated subject, extra limbs, "

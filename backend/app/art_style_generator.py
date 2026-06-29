@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
 
-
 DEFAULT_ART_STYLE_MODEL = "google/nano-banana/text-to-image"
 Z_IMAGE_TURBO_MODEL = "wavespeed-ai/z-image/turbo"
 IMAGE_SAFETY_MODEL = "wavespeed-ai/content-moderator/image"

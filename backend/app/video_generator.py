@@ -14,7 +14,6 @@ from backend.app.caption_style_generator import (
     generate_caption_style_video,
 )
 
-
 VIDEO_OUTPUT_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "videos"
 MAX_ASSET_BYTES = 100 * 1024 * 1024
 FPS = 30
@@ -96,21 +95,27 @@ def _download_asset(client: httpx.Client, url: str, destination: Path, asset_nam
             response.raise_for_status()
             content_length = response.headers.get("content-length")
             if content_length and int(content_length) > MAX_ASSET_BYTES:
-                raise HTTPException(status_code=413, detail=f"{asset_name} exceeds the 100 MB limit.")
+                raise HTTPException(
+                    status_code=413, detail=f"{asset_name} exceeds the 100 MB limit."
+                )
 
             downloaded = 0
             with destination.open("wb") as output:
                 for chunk in response.iter_bytes():
                     downloaded += len(chunk)
                     if downloaded > MAX_ASSET_BYTES:
-                        raise HTTPException(status_code=413, detail=f"{asset_name} exceeds the 100 MB limit.")
+                        raise HTTPException(
+                            status_code=413, detail=f"{asset_name} exceeds the 100 MB limit."
+                        )
                     output.write(chunk)
     except HTTPException:
         destination.unlink(missing_ok=True)
         raise
     except (httpx.HTTPError, ValueError) as exc:
         destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=502, detail=f"Could not download {asset_name}: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Could not download {asset_name}: {exc}"
+        ) from exc
 
 
 def _render_scene_segment(
@@ -194,7 +199,10 @@ def _render_animated_scene_segment(
 
 
 def _concat_segments(segment_paths: list[Path], list_path: Path, output_path: Path) -> None:
-    entries = [f"file '{path.resolve().as_posix().replace(chr(39), chr(39) * 2)}'" for path in segment_paths]
+    entries = [
+        f"file '{path.resolve().as_posix().replace(chr(39), chr(39) * 2)}'"
+        for path in segment_paths
+    ]
     list_path.write_text("\n".join(entries), encoding="utf-8")
     command = [
         "ffmpeg",
@@ -263,7 +271,9 @@ def generate_video(payload: VideoGenerationRequest) -> VideoGenerationResponse:
 
     source_urls = payload.video_urls if payload.visual_source == "animated" else payload.image_urls
     if not source_urls:
-        source_label = "animated scene videos" if payload.visual_source == "animated" else "scene images"
+        source_label = (
+            "animated scene videos" if payload.visual_source == "animated" else "scene images"
+        )
         raise HTTPException(status_code=400, detail=f"Video creation requires {source_label}.")
 
     job_id = uuid.uuid4().hex[:12]

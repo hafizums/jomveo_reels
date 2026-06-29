@@ -1,0 +1,42 @@
+class AppError(Exception):
+    status_code = 500
+    code = "app_error"
+
+    def __init__(self, message: str | None = None) -> None:
+        self.message = message or "An application error occurred."
+        super().__init__(self.message)
+
+
+class ConfigurationError(AppError):
+    code = "configuration_error"
+
+
+class ProviderError(AppError):
+    status_code = 502
+    code = "provider_error"
+
+
+class ProviderAuthError(ProviderError):
+    code = "provider_auth_error"
+
+
+class ProviderForbiddenError(ProviderError):
+    code = "provider_forbidden_error"
+
+
+class ProviderTimeoutError(ProviderError):
+    status_code = 504
+    code = "provider_timeout_error"
+
+
+class ProviderBadResponseError(ProviderError):
+    code = "provider_bad_response_error"
+
+
+class MediaProcessingError(AppError):
+    code = "media_processing_error"
+
+
+class ValidationAppError(AppError):
+    status_code = 400
+    code = "validation_error"

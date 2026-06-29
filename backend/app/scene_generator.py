@@ -1,5 +1,4 @@
 import json
-import os
 from concurrent.futures import ThreadPoolExecutor
 from textwrap import dedent
 from typing import Any
@@ -14,9 +13,9 @@ from backend.app.art_style_generator import (
     ArtStyleRequest,
     generate_art_style_image,
 )
+from backend.app.core.config import get_settings
 
-
-LLM_BASE_URL = os.getenv("WAVESPEED_LLM_BASE_URL", "https://llm.wavespeed.ai/v1")
+LLM_BASE_URL = get_settings().wavespeed_llm_base_url
 DEFAULT_SCENE_PLANNER_MODEL = "openai/gpt-5.4-mini"
 
 
@@ -124,21 +123,30 @@ def _parse_scene_plan(content: str) -> list[PlannedScene]:
 
     raw_scenes = parsed.get("scenes") if isinstance(parsed, dict) else None
     if not isinstance(raw_scenes, list) or not 2 <= len(raw_scenes) <= 10:
-        raise HTTPException(status_code=502, detail="Scene planner must return between 2 and 10 scenes.")
+        raise HTTPException(
+            status_code=502, detail="Scene planner must return between 2 and 10 scenes."
+        )
 
     scenes: list[PlannedScene] = []
     for index, value in enumerate(raw_scenes, start=1):
         if not isinstance(value, dict):
-            raise HTTPException(status_code=502, detail=f"Scene planner returned an invalid scene at position {index}.")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Scene planner returned an invalid scene at position {index}.",
+            )
         narration = value.get("narration")
         image_prompt = value.get("image_prompt")
         motion_prompt = value.get("motion_prompt")
         if not isinstance(narration, str) or not narration.strip():
             raise HTTPException(status_code=502, detail=f"Scene {index} is missing narration.")
         if not isinstance(image_prompt, str) or len(image_prompt.strip()) < 20:
-            raise HTTPException(status_code=502, detail=f"Scene {index} is missing a detailed image prompt.")
+            raise HTTPException(
+                status_code=502, detail=f"Scene {index} is missing a detailed image prompt."
+            )
         if not isinstance(motion_prompt, str) or len(motion_prompt.strip()) < 10:
-            raise HTTPException(status_code=502, detail=f"Scene {index} is missing a motion prompt.")
+            raise HTTPException(
+                status_code=502, detail=f"Scene {index} is missing a motion prompt."
+            )
         scenes.append(
             PlannedScene(
                 narration=narration.strip(),
