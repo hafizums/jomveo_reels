@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from backend.app.api.dependencies import require_wavespeed_api_key
 from backend.app.scene_animation_generator import (
@@ -20,14 +20,16 @@ router = APIRouter()
 @router.post("/art-style/scenes/generate", response_model=SceneSequenceResponse)
 def create_scene_sequence(
     payload: SceneSequenceRequest,
+    request: Request,
     api_key: Annotated[str, Depends(require_wavespeed_api_key)],
 ) -> SceneSequenceResponse:
-    return generate_scene_sequence(api_key, payload)
+    return generate_scene_sequence(api_key, payload, settings=request.app.state.settings)
 
 
 @router.post("/scene-animations/generate", response_model=SceneAnimationResponse)
 def create_scene_animations(
     payload: SceneAnimationRequest,
+    request: Request,
     api_key: Annotated[str, Depends(require_wavespeed_api_key)],
 ) -> SceneAnimationResponse:
-    return generate_scene_animations(api_key, payload)
+    return generate_scene_animations(api_key, payload, settings=request.app.state.settings)

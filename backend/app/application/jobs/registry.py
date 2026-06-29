@@ -43,33 +43,43 @@ def execute_script_generation(input_json: dict[str, Any], settings: Settings) ->
 
 def execute_voiceover_generation(input_json: dict[str, Any], settings: Settings) -> dict[str, Any]:
     payload = VoiceoverRequest.model_validate(input_json)
-    return generate_voiceover(_api_key(settings), payload).model_dump(mode="json")
+    return generate_voiceover(_api_key(settings), payload, settings=settings).model_dump(
+        mode="json"
+    )
 
 
 def execute_background_music_generation(
     input_json: dict[str, Any], settings: Settings
 ) -> dict[str, Any]:
     payload = BackgroundMusicRequest.model_validate(input_json)
-    return generate_background_music(_api_key(settings), payload).model_dump(mode="json")
+    return generate_background_music(_api_key(settings), payload, settings=settings).model_dump(
+        mode="json"
+    )
 
 
 def execute_art_style_generation(input_json: dict[str, Any], settings: Settings) -> dict[str, Any]:
     payload = ArtStyleRequest.model_validate(input_json)
-    return generate_art_style_image(_api_key(settings), payload).model_dump(mode="json")
+    return generate_art_style_image(_api_key(settings), payload, settings=settings).model_dump(
+        mode="json"
+    )
 
 
 def execute_scene_sequence_generation(
     input_json: dict[str, Any], settings: Settings
 ) -> dict[str, Any]:
     payload = SceneSequenceRequest.model_validate(input_json)
-    return generate_scene_sequence(_api_key(settings), payload).model_dump(mode="json")
+    return generate_scene_sequence(_api_key(settings), payload, settings=settings).model_dump(
+        mode="json"
+    )
 
 
 def execute_scene_animation_generation(
     input_json: dict[str, Any], settings: Settings
 ) -> dict[str, Any]:
     payload = SceneAnimationRequest.model_validate(input_json)
-    return generate_scene_animations(_api_key(settings), payload).model_dump(mode="json")
+    return generate_scene_animations(_api_key(settings), payload, settings=settings).model_dump(
+        mode="json"
+    )
 
 
 def execute_video_generation(input_json: dict[str, Any], _settings: Settings) -> dict[str, Any]:

@@ -67,10 +67,12 @@ def submit_prediction(
     api_key: str,
     model: str,
     payload: dict[str, Any],
+    *,
+    api_base_url: str | None = None,
 ) -> dict[str, Any]:
     try:
         response = client.post(
-            f"{API_BASE_URL}/{model}",
+            f"{api_base_url or API_BASE_URL}/{model}",
             headers=wavespeed_headers(api_key),
             json=payload,
         )

@@ -1,11 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
-import httpx
-from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
+from backend.app.core.config import Settings, get_settings
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.infrastructure.providers.wavespeed.client import (
+    WaveSpeedProviderClient,
+    extract_first_asset_url,
+)
 
 WAN_I2V_MODEL = "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast"
 DEFAULT_NEGATIVE_PROMPT = (
@@ -45,36 +48,27 @@ class SceneAnimationResponse(BaseModel):
 def generate_scene_animations(
     api_key: str,
     payload: SceneAnimationRequest,
+    *,
+    provider_client: WaveSpeedProviderClient | None = None,
+    settings: Settings | None = None,
 ) -> SceneAnimationResponse:
+    settings = settings or get_settings()
+    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
     ordered_inputs = sorted(payload.scenes, key=lambda scene: scene.scene_number)
 
     def animate_scene(scene: SceneAnimationInput) -> AnimatedScene:
-        with httpx.Client(timeout=30.0) as client:
-            submitted = submit_prediction(
-                client,
-                api_key,
-                payload.model,
-                {
-                    "prompt": scene.motion_prompt,
-                    "image": scene.image_url,
-                    "negative_prompt": payload.negative_prompt,
-                    "duration": payload.duration,
-                    "seed": -1,
-                },
-            )
-            output = poll_prediction(
-                client,
-                api_key,
-                submitted["urls"]["get"],
-                timeout_detail=f"Timed out animating scene {scene.scene_number}.",
-            )
+        output = provider_client.run_model(
+            payload.model,
+            {
+                "prompt": scene.motion_prompt,
+                "image": scene.image_url,
+                "negative_prompt": payload.negative_prompt,
+                "duration": payload.duration,
+                "seed": -1,
+            },
+        )
 
-        video_url = extract_asset_url(output.get("outputs"))
-        if not video_url:
-            raise HTTPException(
-                status_code=502,
-                detail=f"WaveSpeed did not return a video URL for scene {scene.scene_number}.",
-            )
+        video_url = extract_first_asset_url(output)
         return AnimatedScene(
             scene_number=scene.scene_number,
             image_url=scene.image_url,
