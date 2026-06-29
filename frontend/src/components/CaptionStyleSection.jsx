@@ -1,3 +1,4 @@
+import JobProgress from "./JobProgress";
 import CaptionStylePresetPicker from "./CaptionStylePresetPicker";
 import SectionHeading from "./SectionHeading";
 
@@ -20,7 +21,10 @@ export default function CaptionStyleSection({
   files,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   transcriptFormats,
   onPresetSelect,
   onFieldChange,
@@ -137,8 +141,8 @@ export default function CaptionStyleSection({
             />
           </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Rendering..." : "Render captioned video"}
+          <button type="submit" disabled={!!job}>
+            {job ? "Working..." : "Render captioned video"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
@@ -150,7 +154,7 @@ export default function CaptionStyleSection({
             {result ? <span>{result.style_name}</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="script-content">
               <video className="video-player" controls src={result.output_url}>
                 Your browser does not support video playback.

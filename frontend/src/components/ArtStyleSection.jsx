@@ -1,3 +1,4 @@
+import JobProgress from "./JobProgress";
 import ArtStylePresetPicker from "./ArtStylePresetPicker";
 import SectionHeading from "./SectionHeading";
 
@@ -9,7 +10,10 @@ export default function ArtStyleSection({
   result,
   sceneResult,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   sceneLoading,
   hasScriptText,
   onPresetSelect,
@@ -109,7 +113,7 @@ export default function ArtStyleSection({
           </p>
 
           <button type="submit" disabled={loading || sceneLoading}>
-            {loading ? "Generating..." : "Generate art-style image"}
+            {job ? "Working..." : "Generate art-style image"}
           </button>
 
           <button
@@ -118,7 +122,7 @@ export default function ArtStyleSection({
             onClick={onSceneSubmit}
             disabled={!hasScriptText || loading || sceneLoading}
           >
-            {sceneLoading ? "Generating scene sequence..." : "Generate scenes from latest script"}
+            {sceneJob ? "Working..." : "Generate scenes from latest script"}
           </button>
 
           {!hasScriptText ? (
@@ -135,7 +139,7 @@ export default function ArtStyleSection({
             {!sceneResult && result ? <span>{result.style_name}</span> : null}
           </div>
 
-          {sceneResult ? (
+          {sceneJob ? <JobProgress job={sceneJob} onCancel={onSceneCancel} /> : sceneResult ? (
             <div className="scene-sequence">
               {sceneResult.scenes.map((scene) => (
                 <article className="scene-card" key={scene.scene_number}>

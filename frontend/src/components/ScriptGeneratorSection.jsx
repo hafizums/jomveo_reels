@@ -1,3 +1,4 @@
+import JobProgress from "./JobProgress";
 import ScriptPresetPicker from "./ScriptPresetPicker";
 import SectionHeading from "./SectionHeading";
 
@@ -8,7 +9,10 @@ export default function ScriptGeneratorSection({
   form,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   supportedLanguages,
   durationOptions,
   modelOptions,
@@ -112,8 +116,8 @@ export default function ScriptGeneratorSection({
             />
           </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Writing..." : "Generate script"}
+          <button type="submit" disabled={!!job}>
+            {job ? "Working..." : "Generate script"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
@@ -125,7 +129,7 @@ export default function ScriptGeneratorSection({
             {result ? <span>{result.model}</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="script-content">
               <h3>{result.title}</h3>
               <p className="script-event">{result.event_name}</p>

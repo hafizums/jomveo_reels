@@ -1,10 +1,14 @@
+import JobProgress from "./JobProgress";
 import SectionHeading from "./SectionHeading";
 
 export default function SceneAnimationSection({
   form,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   hasScenes,
   sceneCount,
   onFieldChange,
@@ -49,7 +53,7 @@ export default function SceneAnimationSection({
           </p>
 
           <button type="submit" disabled={!hasScenes || loading}>
-            {loading ? "Animating scenes..." : "Animate all scenes"}
+            {job ? "Working..." : "Animate all scenes"}
           </button>
           {error ? <p className="message error">{error}</p> : null}
         </form>
@@ -60,7 +64,7 @@ export default function SceneAnimationSection({
             {result ? <span>{result.scene_count} clips</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="scene-sequence">
               {result.scenes.map((scene) => (
                 <article className="scene-card" key={scene.scene_number}>

@@ -9,6 +9,7 @@ import ScriptGeneratorSection from "./components/ScriptGeneratorSection";
 import VoiceoverGeneratorSection from "./components/VoiceoverGeneratorSection";
 import VideoGeneratorSection from "./components/VideoGeneratorSection";
 import SceneAnimationSection from "./components/SceneAnimationSection";
+import JobProgress from "./components/JobProgress";
 import {
   artStylePresets,
   defaultArtStylePreset,
@@ -125,36 +126,77 @@ export default function App() {
   const [scriptForm, setScriptForm] = useState(initialScriptForm);
   const [scriptResult, setScriptResult] = useState(null);
   const [scriptError, setScriptError] = useState("");
-  const [scriptLoading, setScriptLoading] = useState(false);
+  const [scriptJob, setScriptJob] = useState(null);
   const [voiceForm, setVoiceForm] = useState(initialVoiceForm);
   const [voiceResult, setVoiceResult] = useState(null);
   const [voiceError, setVoiceError] = useState("");
-  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceJob, setVoiceJob] = useState(null);
   const [musicForm, setMusicForm] = useState(initialMusicForm);
   const [musicResult, setMusicResult] = useState(null);
   const [musicError, setMusicError] = useState("");
-  const [musicLoading, setMusicLoading] = useState(false);
+  const [musicJob, setMusicJob] = useState(null);
   const [artForm, setArtForm] = useState(initialArtForm);
   const [artResult, setArtResult] = useState(null);
   const [artError, setArtError] = useState("");
-  const [artLoading, setArtLoading] = useState(false);
+  const [artJob, setArtJob] = useState(null);
   const [artSceneResult, setArtSceneResult] = useState(null);
-  const [artSceneLoading, setArtSceneLoading] = useState(false);
+  const [artSceneJob, setArtSceneJob] = useState(null);
   const [sceneAnimationForm, setSceneAnimationForm] = useState(initialSceneAnimationForm);
   const [sceneAnimationResult, setSceneAnimationResult] = useState(null);
   const [sceneAnimationError, setSceneAnimationError] = useState("");
-  const [sceneAnimationLoading, setSceneAnimationLoading] = useState(false);
+  const [sceneAnimationJob, setSceneAnimationJob] = useState(null);
   const [captionForm, setCaptionForm] = useState(initialCaptionForm);
   const [captionFiles, setCaptionFiles] = useState(initialCaptionFiles);
   const [captionResult, setCaptionResult] = useState(null);
   const [captionError, setCaptionError] = useState("");
-  const [captionLoading, setCaptionLoading] = useState(false);
+  const [captionJob, setCaptionJob] = useState(null);
   const [videoForm, setVideoForm] = useState(initialVideoForm);
   const [videoResult, setVideoResult] = useState(null);
   const [videoError, setVideoError] = useState("");
-  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoJob, setVideoJob] = useState(null);
+
+
+  const pollJob = async (jobId, setJob, setResult, setError, onSuccess) => {
+    let polling = true;
+    while (polling) {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || data.error?.message || "Polling failed");
+        
+        setJob(data);
+
+        if (data.status === "completed") {
+          setResult(data.result);
+          setJob(null);
+          polling = false;
+          if (onSuccess) onSuccess(data.result);
+        } else if (data.status === "failed" || data.status === "cancelled") {
+          setError(data.error?.message || `Job ${data.status}`);
+          setJob(null);
+          polling = false;
+        } else {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } catch (err) {
+        setError(err.message);
+        setJob(null);
+        polling = false;
+      }
+    }
+  };
+
+  const cancelJob = async (jobId, setJob) => {
+    try {
+      await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+      setJob((current) => (current ? { ...current, status: "cancelling" } : null));
+    } catch (err) {
+      console.error("Failed to cancel job:", err);
+    }
+  };
 
   const selectedPreset =
+
     scriptPresets.find((preset) => preset.id === selectedPresetId) ?? defaultScriptPreset;
   const selectedVoiceStyle =
     voiceStyles.find((style) => style.id === selectedVoiceStyleId) ?? defaultVoiceStyle;
@@ -678,7 +720,8 @@ export default function App() {
             form={scriptForm}
             result={scriptResult}
             error={scriptError}
-            loading={scriptLoading}
+            job={scriptJob}
+            onCancel={() => cancelJob(scriptJob?.job_id, setScriptJob)}
             supportedLanguages={supportedLanguages}
             durationOptions={durationOptions}
             modelOptions={scriptModelOptions}
@@ -696,7 +739,8 @@ export default function App() {
             form={voiceForm}
             result={voiceResult}
             error={voiceError}
-            loading={voiceLoading}
+            job={voiceJob}
+            onCancel={() => cancelJob(voiceJob?.job_id, setVoiceJob)}
             hasScriptText={Boolean(scriptResult?.script)}
             supportedVoiceGenders={supportedVoiceGenders}
             modelOptions={voiceModelOptions}
@@ -717,7 +761,8 @@ export default function App() {
             form={musicForm}
             result={musicResult}
             error={musicError}
-            loading={musicLoading}
+            job={musicJob}
+            onCancel={() => cancelJob(musicJob?.job_id, setMusicJob)}
             hasScriptText={Boolean(scriptResult?.script)}
             variantOptions={backgroundMusicVariants}
             onPresetSelect={applyMusicPreset}
@@ -736,8 +781,10 @@ export default function App() {
             result={artResult}
             sceneResult={artSceneResult}
             error={artError}
-            loading={artLoading}
-            sceneLoading={artSceneLoading}
+            job={artJob}
+            onCancel={() => cancelJob(artJob?.job_id, setArtJob)}
+            sceneJob={artSceneJob}
+            onSceneCancel={() => cancelJob(artSceneJob?.job_id, setArtSceneJob)}
             hasScriptText={Boolean(scriptResult?.script)}
             onPresetSelect={applyArtStylePreset}
             onUseLatestScript={useLatestScriptForArt}
@@ -755,7 +802,8 @@ export default function App() {
             files={captionFiles}
             result={captionResult}
             error={captionError}
-            loading={captionLoading}
+            job={captionJob}
+            onCancel={() => cancelJob(captionJob?.job_id, setCaptionJob)}
             transcriptFormats={transcriptFormats}
             onPresetSelect={applyCaptionStylePreset}
             onFieldChange={updateCaptionField}
@@ -769,7 +817,8 @@ export default function App() {
             form={sceneAnimationForm}
             result={sceneAnimationResult}
             error={sceneAnimationError}
-            loading={sceneAnimationLoading}
+            job={sceneAnimationJob}
+            onCancel={() => cancelJob(sceneAnimationJob?.job_id, setSceneAnimationJob)}
             hasScenes={Boolean(artSceneResult?.scenes?.length)}
             sceneCount={artSceneResult?.scene_count || 0}
             onFieldChange={updateSceneAnimationField}
@@ -782,7 +831,8 @@ export default function App() {
             form={videoForm}
             result={videoResult}
             error={videoError}
-            loading={videoLoading}
+            job={videoJob}
+            onCancel={() => cancelJob(videoJob?.job_id, setVideoJob)}
             hasScenes={Boolean(artSceneResult?.scenes?.length)}
             hasVoiceover={Boolean(voiceResult?.audio_url)}
             hasMusic={Boolean(musicResult?.audio_urls?.length)}

@@ -1,3 +1,4 @@
+import JobProgress from "./JobProgress";
 import SectionHeading from "./SectionHeading";
 import VoiceStylePicker from "./VoiceStylePicker";
 
@@ -8,7 +9,10 @@ export default function VoiceoverGeneratorSection({
   form,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   hasScriptText,
   supportedVoiceGenders,
   modelOptions,
@@ -138,8 +142,8 @@ export default function VoiceoverGeneratorSection({
             </>
           )}
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Generating..." : "Generate voiceover"}
+          <button type="submit" disabled={!!job}>
+            {job ? "Working..." : "Generate voiceover"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
@@ -151,7 +155,7 @@ export default function VoiceoverGeneratorSection({
             {result ? <span>{result.style_name}</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="script-content">
               <p className="script-event">Model: {result.model}</p>
               {result.model === geminiModel ? (

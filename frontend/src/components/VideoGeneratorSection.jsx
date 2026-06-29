@@ -1,10 +1,14 @@
+import JobProgress from "./JobProgress";
 import SectionHeading from "./SectionHeading";
 
 export default function VideoGeneratorSection({
   form,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   hasScenes,
   hasVoiceover,
   hasMusic,
@@ -111,7 +115,7 @@ export default function VideoGeneratorSection({
           </p>
 
           <button type="submit" disabled={!canGenerate || loading}>
-            {loading ? "Creating final video..." : "Create video"}
+            {job ? "Working..." : "Create video"}
           </button>
           {!canGenerate ? (
             <p className="message error">Generate the selected visual source and voiceover first.</p>
@@ -125,7 +129,7 @@ export default function VideoGeneratorSection({
             {result ? <span>{result.aspect_ratio}</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="script-content">
               <video className="video-player generated-video" controls src={result.output_url}>
                 Your browser does not support video playback.

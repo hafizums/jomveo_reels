@@ -1,3 +1,4 @@
+import JobProgress from "./JobProgress";
 import MusicPresetPicker from "./MusicPresetPicker";
 import SectionHeading from "./SectionHeading";
 
@@ -7,7 +8,10 @@ export default function BackgroundMusicSection({
   form,
   result,
   error,
-  loading,
+  job,
+  onCancel,
+  sceneJob,
+  onSceneCancel,
   hasScriptText,
   variantOptions,
   onPresetSelect,
@@ -104,8 +108,8 @@ export default function BackgroundMusicSection({
             />
           </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Generating..." : "Generate background music"}
+          <button type="submit" disabled={!!job}>
+            {job ? "Working..." : "Generate background music"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
@@ -117,7 +121,7 @@ export default function BackgroundMusicSection({
             {result ? <span>{result.style_name}</span> : null}
           </div>
 
-          {result ? (
+          {job ? <JobProgress job={job} onCancel={onCancel} /> : result ? (
             <div className="script-content">
               <p className="script-event">Model: {result.model}</p>
               {result.audio_urls.map((audioUrl, index) => (
