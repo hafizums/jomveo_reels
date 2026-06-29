@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
 
-
 DEFAULT_VOICEOVER_MODEL = "elevenlabs/multilingual-v2"
 GEMINI_FLASH_TTS_MODEL = "google/gemini-2.5-flash/text-to-speech"
 DEFAULT_VOICE_ID = "Lily"
@@ -15,11 +14,36 @@ DEFAULT_SIMILARITY = 0.85
 DEFAULT_STABILITY = 0.45
 DEFAULT_USE_SPEAKER_BOOST = True
 GEMINI_VOICES = {
-    "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede",
-    "Autonoe", "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome",
-    "Fenrir", "Gacrux", "Iapetus", "Kore", "Laomedeia", "Leda", "Orus",
-    "Puck", "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar",
-    "Sulafat", "Umbriel", "Vindemiatrix", "Zephyr", "Zubenelgenubi",
+    "Achernar",
+    "Achird",
+    "Algenib",
+    "Algieba",
+    "Alnilam",
+    "Aoede",
+    "Autonoe",
+    "Callirrhoe",
+    "Charon",
+    "Despina",
+    "Enceladus",
+    "Erinome",
+    "Fenrir",
+    "Gacrux",
+    "Iapetus",
+    "Kore",
+    "Laomedeia",
+    "Leda",
+    "Orus",
+    "Puck",
+    "Pulcherrima",
+    "Rasalgethi",
+    "Sadachbia",
+    "Sadaltager",
+    "Schedar",
+    "Sulafat",
+    "Umbriel",
+    "Vindemiatrix",
+    "Zephyr",
+    "Zubenelgenubi",
 }
 
 
@@ -63,7 +87,9 @@ def generate_voiceover(api_key: str, payload: VoiceoverRequest) -> VoiceoverResp
         if not spoken_text.casefold().startswith(speaker_prefix.casefold()):
             spoken_text = f"{speaker_prefix} {spoken_text}"
         if len(spoken_text.encode("utf-8")) > 8000:
-            raise HTTPException(status_code=400, detail="Gemini TTS text must not exceed 8,000 bytes.")
+            raise HTTPException(
+                status_code=400, detail="Gemini TTS text must not exceed 8,000 bytes."
+            )
         provider_payload: dict[str, Any] = {
             "text": spoken_text,
             "language": payload.language,

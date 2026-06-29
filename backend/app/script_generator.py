@@ -1,5 +1,4 @@
 import json
-import os
 from textwrap import dedent
 from typing import Any
 
@@ -7,8 +6,9 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+from backend.app.core.config import get_settings
 
-LLM_BASE_URL = os.getenv("WAVESPEED_LLM_BASE_URL", "https://llm.wavespeed.ai/v1")
+LLM_BASE_URL = get_settings().wavespeed_llm_base_url
 DEFAULT_SCRIPT_MODEL = "openai/gpt-5.1"
 DEFAULT_SCRIPT_STYLE = "Storytelling"
 DEFAULT_SCRIPT_DURATION_SECONDS = 60
@@ -161,15 +161,21 @@ def _parse_script_content(content: str) -> dict[str, str]:
 def _extract_message_content(response_json: dict[str, Any]) -> str:
     choices = response_json.get("choices")
     if not isinstance(choices, list) or not choices:
-        raise HTTPException(status_code=502, detail="WaveSpeed LLM response did not include any choices.")
+        raise HTTPException(
+            status_code=502, detail="WaveSpeed LLM response did not include any choices."
+        )
 
     message = choices[0].get("message")
     if not isinstance(message, dict):
-        raise HTTPException(status_code=502, detail="WaveSpeed LLM response did not include a message.")
+        raise HTTPException(
+            status_code=502, detail="WaveSpeed LLM response did not include a message."
+        )
 
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise HTTPException(status_code=502, detail="WaveSpeed LLM response did not include text content.")
+        raise HTTPException(
+            status_code=502, detail="WaveSpeed LLM response did not include text content."
+        )
 
     return content
 

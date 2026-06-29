@@ -10,7 +10,6 @@ from typing import Any
 from fastapi import HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-
 DEFAULT_CAPTION_TEMPLATE = "minimalist"
 DEFAULT_TRANSCRIPT_FORMAT = "auto"
 OUTPUT_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "captions"
@@ -106,10 +105,14 @@ def save_uploaded_file(upload: UploadFile, category: str) -> Path:
 def generate_caption_style_video(request: CaptionStyleRequest) -> CaptionStyleResponse:
     input_path = Path(request.input_video_path)
     if not input_path.exists():
-        raise HTTPException(status_code=400, detail=f"Input video not found: {request.input_video_path}")
+        raise HTTPException(
+            status_code=400, detail=f"Input video not found: {request.input_video_path}"
+        )
 
     if request.transcript_path.strip() and not Path(request.transcript_path).exists():
-        raise HTTPException(status_code=400, detail=f"Transcript not found: {request.transcript_path}")
+        raise HTTPException(
+            status_code=400, detail=f"Transcript not found: {request.transcript_path}"
+        )
 
     output_path = _resolve_output_path(request)
     command = _build_command(request, output_path)

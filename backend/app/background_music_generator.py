@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
 
-
 DEFAULT_BACKGROUND_MUSIC_MODEL = "mureka-ai/mureka-v9/generate-bgm"
 DEFAULT_OUTPUT_FORMAT = "mp3"
 DEFAULT_NUMBER_OF_SONGS = 1
@@ -36,7 +35,11 @@ class BackgroundMusicResponse(BaseModel):
 
 def _extract_audio_urls(value: Any) -> list[str]:
     if isinstance(value, list):
-        urls = [item for item in value if isinstance(item, str) and item.startswith(("http://", "https://"))]
+        urls = [
+            item
+            for item in value
+            if isinstance(item, str) and item.startswith(("http://", "https://"))
+        ]
         return urls
 
     single_url = extract_asset_url(value)
