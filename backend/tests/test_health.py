@@ -14,6 +14,7 @@ def test_public_route_contract_is_preserved() -> None:
     assert {
         "/api/health",
         "/api/ready",
+        "/api/provider/wavespeed/status",
         "/api/scripts/generate",
         "/api/voiceovers/generate",
         "/api/background-music/generate",

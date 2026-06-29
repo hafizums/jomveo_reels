@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import wavespeed
 from wavespeed import Client
 
 from backend.app.core.config import Settings
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class WaveSpeedSDKClient:
+    provider_mode = "sdk"
+
     def __init__(
         self,
         settings: Settings,
@@ -73,6 +76,10 @@ class WaveSpeedSDKClient:
         if not isinstance(url, str) or not url.startswith(("http://", "https://")):
             raise ProviderBadResponseError("WaveSpeed SDK upload returned an invalid URL.")
         return url
+
+    def sdk_version(self) -> str | None:
+        version = getattr(wavespeed, "__version__", None)
+        return str(version) if version else None
 
     def _map_exception(self, exc: Exception) -> ProviderError:
         logger.warning(

@@ -263,6 +263,9 @@ WAVESPEED_PROVIDER_MODE=sdk
 WAVESPEED_SDK_TIMEOUT_SECONDS=36000
 WAVESPEED_SDK_POLL_INTERVAL_SECONDS=1
 WAVESPEED_SDK_ENABLE_SYNC_MODE=false
+ALLOW_PROVIDER_LIVE_CHECKS=false
+PROVIDER_SMOKE_TEST_MODEL=wavespeed-ai/z-image/turbo
+PROVIDER_SMOKE_TEST_TIMEOUT_SECONDS=120
 ```
 
 Current provider classification:
@@ -282,6 +285,45 @@ WAVESPEED_PROVIDER_MODE=legacy_http
 The legacy mode retains the previous submit/poll implementation. Chat-completion flows
 remain legacy in either mode. The SDK serverless-worker features are intentionally not
 used by this application.
+
+### Provider diagnostics and observability
+
+`GET /api/provider/wavespeed/status` reports the selected provider mode, installed SDK
+version, whether a key is configured, and the legacy chat-completions classification. It
+does not expose the key and does not contact WaveSpeed by default. `?live=true` is also
+local-only unless `ALLOW_PROVIDER_LIVE_CHECKS=true` and a key is configured; even then it
+only verifies SDK client construction and does not run a paid model.
+
+Each persistent job records a `ProviderRun` with `started_at`, `completed_at`,
+`duration_ms`, `external_request_id`, `sdk_version`, and `provider_mode`. Request and
+response summaries contain only operational metadata such as job type, model, mode,
+result availability, and output count. API keys, full prompts/scripts, payloads, and raw
+provider responses are deliberately excluded. Concurrent scene image workers create an
+independent provider client per scene; Z Image Turbo retains its sequential behavior.
+
+The normal backend suite is fully offline and skips provider smoke tests:
+
+```bash
+python -m pytest backend/tests
+```
+
+To deliberately run the single real-provider staging smoke test, configure a low-cost
+model if needed and opt in explicitly:
+
+```bash
+RUN_LIVE_PROVIDER_TESTS=1 WAVESPEED_API_KEY=... python -m pytest backend/tests/live -m live_provider
+```
+
+PowerShell:
+
+```powershell
+$env:RUN_LIVE_PROVIDER_TESTS="1"
+$env:WAVESPEED_API_KEY="..."
+python -m pytest backend/tests/live -m live_provider
+```
+
+The live smoke test performs one image generation and may consume WaveSpeed credits. It
+is never required for the offline quality checks.
 
 Common backend commands:
 

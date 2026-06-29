@@ -6,6 +6,7 @@ from backend.app.api.v1 import (
     health,
     jobs,
     music,
+    provider,
     scenes,
     scripts,
     videos,
@@ -14,6 +15,7 @@ from backend.app.api.v1 import (
 
 router = APIRouter()
 router.include_router(health.router, tags=["health"])
+router.include_router(provider.router, prefix="/provider", tags=["provider"])
 router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 router.include_router(scripts.router, prefix="/scripts", tags=["scripts"])
 router.include_router(voiceovers.router, prefix="/voiceovers", tags=["voiceovers"])

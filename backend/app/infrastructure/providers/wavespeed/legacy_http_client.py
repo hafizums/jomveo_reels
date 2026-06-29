@@ -9,6 +9,8 @@ from backend.app.wavespeed_api import poll_prediction, submit_prediction
 
 
 class WaveSpeedLegacyHTTPClient:
+    provider_mode = "legacy_http"
+
     def __init__(self, settings: Settings, *, api_key: str | None = None) -> None:
         self.settings = settings
         self.api_key = api_key or settings.wavespeed_api_key
@@ -46,3 +48,6 @@ class WaveSpeedLegacyHTTPClient:
 
     def upload_file(self, path: Path) -> str:
         raise ProviderError("Legacy WaveSpeed file upload is not supported.")
+
+    def sdk_version(self) -> str | None:
+        return None

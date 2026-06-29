@@ -4,13 +4,18 @@ from typing import Any
 import pytest
 import wavespeed
 
-from backend.app.art_style_generator import ArtStyleRequest, generate_art_style_image
+from backend.app.art_style_generator import (
+    ArtStyleRequest,
+    ArtStyleResponse,
+    generate_art_style_image,
+)
 from backend.app.background_music_generator import (
     BackgroundMusicRequest,
     generate_background_music,
 )
 from backend.app.core.config import Settings
 from backend.app.core.errors import (
+    ConfigurationError,
     ProviderAuthError,
     ProviderBadResponseError,
     ProviderError,
@@ -31,6 +36,12 @@ from backend.app.scene_animation_generator import (
     SceneAnimationInput,
     SceneAnimationRequest,
     generate_scene_animations,
+)
+from backend.app.scene_generator import (
+    PlannedScene,
+    SceneSequenceRequest,
+    _generate_scene_plan,
+    generate_scene_sequence,
 )
 from backend.app.script_generator import ScriptRequest, generate_video_script
 from backend.app.voiceover_generator import VoiceoverRequest, generate_voiceover
@@ -73,6 +84,54 @@ def test_official_sdk_dependency_is_importable() -> None:
 def test_provider_mode_can_select_legacy_rollback_client() -> None:
     client = create_wavespeed_provider_client(_settings(wavespeed_provider_mode="legacy_http"))
     assert isinstance(client, WaveSpeedLegacyHTTPClient)
+
+
+def test_provider_mode_selects_sdk_client_by_default() -> None:
+    assert isinstance(create_wavespeed_provider_client(_settings()), WaveSpeedSDKClient)
+
+
+def test_unsupported_provider_mode_is_rejected() -> None:
+    with pytest.raises(ConfigurationError):
+        create_wavespeed_provider_client(_settings(wavespeed_provider_mode="unknown"))
+
+
+def test_legacy_rollback_client_uses_submit_and_poll(monkeypatch) -> None:
+    submitted_payloads = []
+    polled_urls = []
+
+    class FakeHTTPClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    monkeypatch.setattr(
+        "backend.app.infrastructure.providers.wavespeed.legacy_http_client.httpx.Client",
+        lambda **_kwargs: FakeHTTPClient(),
+    )
+
+    def fake_submit(_client, _key, model, payload, **_kwargs):
+        submitted_payloads.append((model, payload))
+        return {"urls": {"get": "https://example.test/status"}}
+
+    def fake_poll(_client, _key, status_url, _timeout_message):
+        polled_urls.append(status_url)
+        return {"outputs": ["https://example.test/image.png"]}
+
+    monkeypatch.setattr(
+        "backend.app.infrastructure.providers.wavespeed.legacy_http_client.submit_prediction",
+        fake_submit,
+    )
+    monkeypatch.setattr(
+        "backend.app.infrastructure.providers.wavespeed.legacy_http_client.poll_prediction",
+        fake_poll,
+    )
+    result = WaveSpeedLegacyHTTPClient(_settings()).run_model("model", {"prompt": "test"})
+
+    assert result["outputs"] == ["https://example.test/image.png"]
+    assert submitted_payloads == [("model", {"prompt": "test"})]
+    assert polled_urls == ["https://example.test/status"]
 
 
 def test_sdk_run_model_passes_supported_options_and_normalizes() -> None:
@@ -156,6 +215,12 @@ def test_sdk_malformed_response_maps_to_bad_response() -> None:
         client.run_model("model", {})
 
 
+def test_sdk_empty_outputs_map_to_bad_response() -> None:
+    client = WaveSpeedSDKClient(_settings(), sdk_client=FakeSDK(response={"outputs": []}))
+    with pytest.raises(ProviderBadResponseError):
+        client.run_model("model", {})
+
+
 class FakeProvider:
     def __init__(self, outputs: Any) -> None:
         self.outputs = outputs
@@ -180,6 +245,32 @@ def test_art_style_uses_provider_client_boundary() -> None:
         ),
         provider_client=provider,
     )
+    assert result.image_url == "https://example.test/image.png"
+    assert len(provider.calls) == 1
+
+
+def test_sdk_backed_generator_selects_sdk_mode_by_default(monkeypatch) -> None:
+    provider = FakeProvider(["https://example.test/image.png"])
+
+    def fake_factory(settings, *, api_key=None):
+        assert settings.wavespeed_provider_mode == "sdk"
+        assert api_key == "test-key"
+        return provider
+
+    monkeypatch.setattr(
+        "backend.app.art_style_generator.create_wavespeed_provider_client",
+        fake_factory,
+    )
+    result = generate_art_style_image(
+        "test-key",
+        ArtStyleRequest(
+            prompt="A cinematic mountain landscape",
+            art_direction="Dramatic realism",
+            enable_safety_checker=False,
+        ),
+        settings=_settings(),
+    )
+
     assert result.image_url == "https://example.test/image.png"
     assert len(provider.calls) == 1
 
@@ -268,3 +359,102 @@ def test_script_generation_remains_on_legacy_chat_completions(monkeypatch) -> No
     )
     result = generate_video_script("test-key", ScriptRequest())
     assert result.script == "Legacy HTTP script"
+
+
+def test_scene_planner_remains_on_legacy_chat_completions(monkeypatch) -> None:
+    content = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        '{"scenes":['
+                        '{"narration":"First",'
+                        '"image_prompt":"A detailed cinematic first image prompt",'
+                        '"motion_prompt":"A slow camera push"},'
+                        '{"narration":"Second",'
+                        '"image_prompt":"A detailed cinematic second image prompt",'
+                        '"motion_prompt":"A gentle camera pan"}'
+                        "]}"
+                    )
+                }
+            }
+        ]
+    }
+
+    class SceneResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return content
+
+    class SceneClient(FakeLLMClient):
+        def post(self, url, **_kwargs):
+            assert url.endswith("/chat/completions")
+            return SceneResponse()
+
+    monkeypatch.setattr(
+        "backend.app.scene_generator.httpx.Client",
+        lambda **_kwargs: SceneClient(),
+    )
+    scenes = _generate_scene_plan(
+        "test-key",
+        SceneSequenceRequest(
+            script="A sufficiently long script for scene planning.",
+            art_direction="Dramatic cinematic realism",
+        ),
+    )
+    assert len(scenes) == 2
+
+
+def test_parallel_scene_rendering_uses_one_provider_client_per_scene(monkeypatch) -> None:
+    planned = [
+        PlannedScene(
+            narration=f"Scene {index}",
+            image_prompt=f"A sufficiently detailed cinematic image prompt number {index}",
+            motion_prompt="A subtle camera movement",
+        )
+        for index in range(1, 4)
+    ]
+    clients = []
+    used_client_ids = []
+
+    class RenderClient:
+        pass
+
+    def factory():
+        client = RenderClient()
+        clients.append(client)
+        return client
+
+    def fake_render(_api_key, payload, *, provider_client, **_kwargs):
+        used_client_ids.append(id(provider_client))
+        return ArtStyleResponse(
+            prompt=payload.prompt,
+            style_name=payload.style_name,
+            art_direction=payload.art_direction,
+            styled_prompt=payload.prompt,
+            model=payload.model,
+            enable_safety_checker=payload.enable_safety_checker,
+            safety_output=None,
+            image_url="https://example.test/image.png",
+            raw_output={},
+        )
+
+    monkeypatch.setattr("backend.app.scene_generator._generate_scene_plan", lambda *_args: planned)
+    monkeypatch.setattr("backend.app.scene_generator.generate_art_style_image", fake_render)
+    result = generate_scene_sequence(
+        "test-key",
+        SceneSequenceRequest(
+            script="A sufficiently long script for safe parallel rendering.",
+            art_direction="Dramatic cinematic realism",
+        ),
+        provider_client_factory=factory,
+        settings=_settings(),
+    )
+
+    assert result.scene_count == 3
+    assert len(clients) == 3
+    assert len(set(used_client_ids)) == 3

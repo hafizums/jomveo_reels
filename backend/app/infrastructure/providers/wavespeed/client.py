@@ -6,6 +6,8 @@ from backend.app.wavespeed_api import extract_asset_url
 
 
 class WaveSpeedProviderClient(Protocol):
+    provider_mode: str
+
     def run_model(
         self,
         model: str,
@@ -17,6 +19,8 @@ class WaveSpeedProviderClient(Protocol):
     ) -> dict[str, Any]: ...
 
     def upload_file(self, path: Path) -> str: ...
+
+    def sdk_version(self) -> str | None: ...
 
 
 def normalize_wavespeed_response(response: Any) -> dict[str, Any]:
