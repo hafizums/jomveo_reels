@@ -40,3 +40,8 @@ class MediaProcessingError(AppError):
 class ValidationAppError(AppError):
     status_code = 400
     code = "validation_error"
+
+
+class JobNotFoundError(AppError):
+    status_code = 404
+    code = "job_not_found"

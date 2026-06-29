@@ -3,6 +3,10 @@ uvicorn[standard]==0.35.0
 python-dotenv==1.1.1
 pydantic-settings>=2.10,<3
 httpx==0.28.1
+SQLAlchemy>=2.0,<3
+alembic>=1.16,<2
+redis>=6,<8
+rq>=2.6,<3
 python-multipart==0.0.20
 pycaps[base] @ git+https://github.com/francozanardi/pycaps.git@68a6843bbd3f7d0ea33047ffb1045d978a7671c4
 pytest>=8.4,<9

@@ -22,6 +22,10 @@ class Settings(BaseSettings):
         ]
     )
     generated_root: Path = BACKEND_ROOT / "generated"
+    database_url: str = "sqlite:///backend/generated/jomveo.db"
+    queue_backend: str = "inline"
+    redis_url: str = "redis://localhost:6379/0"
+    job_default_timeout_seconds: int = 1800
     log_level: str = "INFO"
     request_id_header: str = "X-Request-ID"
 
