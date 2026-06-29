@@ -170,3 +170,36 @@ python -m pytest backend/tests
 python -m ruff check backend/app backend/tests
 python -m ruff format --check backend/app backend/tests
 ```
+
+## Persistent generation jobs
+
+Script generation also has a persistent job endpoint at
+`POST /api/jobs/scripts/generate`. The synchronous `POST /api/scripts/generate`
+endpoint remains available. Job state is available from `GET /api/jobs/{job_id}`
+and recent jobs from `GET /api/jobs?limit=20`.
+
+The local defaults use SQLite and execute jobs inline. Configure the job system
+in `backend/.env` when Redis Queue execution is needed:
+
+```env
+DATABASE_URL=sqlite:///backend/generated/jomveo.db
+QUEUE_BACKEND=inline
+REDIS_URL=redis://localhost:6379/0
+JOB_DEFAULT_TIMEOUT_SECONDS=1800
+```
+
+Common backend commands:
+
+```bash
+# Run API
+uvicorn backend.app.main:app --reload
+
+# Run tests
+python -m pytest backend/tests
+
+# Run RQ worker when QUEUE_BACKEND=rq
+python -m backend.app.workers.rq_worker
+
+# Run migrations
+alembic upgrade head
+```

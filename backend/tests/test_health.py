@@ -22,6 +22,9 @@ def test_public_route_contract_is_preserved() -> None:
         "/api/videos/generate",
         "/api/scene-animations/generate",
         "/api/caption-style/generate",
+        "/api/jobs/scripts/generate",
+        "/api/jobs/{job_id}",
+        "/api/jobs",
         "/generated",
     } <= paths
 

@@ -10,6 +10,10 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.api_v1_prefix == "/api"
     assert isinstance(settings.generated_root, Path)
     assert "http://localhost:5173" in settings.cors_allowed_origins
+    assert settings.database_url == "sqlite:///backend/generated/jomveo.db"
+    assert settings.queue_backend == "inline"
+    assert settings.redis_url == "redis://localhost:6379/0"
+    assert settings.job_default_timeout_seconds == 1800
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:
