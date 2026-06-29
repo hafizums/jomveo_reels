@@ -1,0 +1,6 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+python-dotenv==1.1.1
+httpx==0.28.1
+python-multipart==0.0.20
+pycaps[base] @ git+https://github.com/francozanardi/pycaps.git@68a6843bbd3f7d0ea33047ffb1045d978a7671c4

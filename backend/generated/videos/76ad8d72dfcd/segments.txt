@@ -1,0 +1,6 @@
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-01.mp4'
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-02.mp4'
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-03.mp4'
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-04.mp4'
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-05.mp4'
+file 'C:/Users/froxt/Downloads/jomveo/backend/generated/videos/76ad8d72dfcd/segments/scene-06.mp4'
