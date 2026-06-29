@@ -1,10 +1,13 @@
 import logging
+from datetime import timedelta
+from typing import Any
 
 from fastapi import HTTPException
 
-from backend.app.application.jobs.registry import get_job_handler
+from backend.app.application.jobs.registry import get_job_definition
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import AppError
+from backend.app.db.models import utc_now
 from backend.app.db.session import (
     SessionFactory,
     create_database_engine,
@@ -14,25 +17,60 @@ from backend.app.repositories.jobs import JobRepository
 from backend.app.repositories.provider_runs import ProviderRunRepository
 
 logger = logging.getLogger(__name__)
+RETRYABLE_ERROR_CODES = {
+    "provider_error",
+    "provider_timeout_error",
+    "provider_bad_response_error",
+    "internal_server_error",
+}
 
 
-def _mark_failed(
+def _initial_progress_total(job_type: str, input_json: dict[str, Any]) -> int:
+    if job_type == "scene_animation.generate":
+        scenes = input_json.get("scenes")
+        return len(scenes) if isinstance(scenes, list) and scenes else 1
+    if job_type == "video.generate":
+        return 5
+    return 1
+
+
+def _record_failure(
     session_factory: SessionFactory,
+    settings: Settings,
     job_id: str,
     provider_run_id: str | None,
     code: str,
     message: str,
 ) -> None:
     with session_factory() as session:
-        job = JobRepository(session).get(job_id)
-        if job is not None:
-            JobRepository(session).mark_failed(job, code, message)
+        job_repository = JobRepository(session)
+        job = job_repository.get(job_id)
+        if job is not None and job.status != "cancelled":
+            if code in RETRYABLE_ERROR_CODES and job.attempt_count < job.max_attempts:
+                next_retry_at = utc_now() + timedelta(seconds=settings.job_retry_backoff_seconds)
+                job_repository.mark_retrying(job, code, message, next_retry_at)
+            else:
+                job_repository.mark_failed(job, code, message)
         if provider_run_id:
             provider_run_repository = ProviderRunRepository(session)
             provider_run = provider_run_repository.get(provider_run_id)
             if provider_run is not None:
                 provider_run_repository.mark_failed(provider_run, code, message)
         session.commit()
+
+
+def _http_error(exc: HTTPException) -> tuple[str, str]:
+    message = exc.detail if isinstance(exc.detail, str) else "Job provider request failed."
+    message_lower = message.casefold()
+    if exc.status_code < 500:
+        return "validation_error", message
+    if exc.status_code == 504:
+        return "provider_timeout_error", message
+    if "401" in message_lower or "unauthorized" in message_lower:
+        return "provider_auth_error", message
+    if "403" in message_lower or "forbidden" in message_lower or "denied" in message_lower:
+        return "provider_forbidden_error", message
+    return "provider_error", message
 
 
 def execute_job(
@@ -51,38 +89,51 @@ def execute_job(
     try:
         with session_factory() as session:
             job_repository = JobRepository(session)
-            job = job_repository.get(job_id)
+            job = job_repository.claim_for_execution(job_id, settings.job_worker_id)
             if job is None:
-                logger.warning("job_not_found", extra={"job_id": job_id})
-                return
-            if job.status != "queued":
+                existing = job_repository.get(job_id)
+                if existing is None:
+                    logger.warning("job_not_found", extra={"job_id": job_id})
+                    return
                 logger.info(
                     "job_execution_skipped",
-                    extra={"job_id": job_id, "job_status": job.status},
+                    extra={"job_id": job_id, "job_status": existing.status},
                 )
                 return
 
-            job_repository.mark_running(job)
+            definition = get_job_definition(job.type)
+            progress_total = _initial_progress_total(job.type, job.input_json)
+            job_repository.set_progress_total(job, progress_total)
             provider_run = ProviderRunRepository(session).create(
                 job_id=job.id,
-                provider="wavespeed",
+                provider=definition.provider,
                 model=str(job.input_json.get("model") or "") or None,
-                request_summary={"job_type": job.type},
+                request_summary={
+                    "job_type": job.type,
+                    "model": job.input_json.get("model"),
+                },
             )
             provider_run_id = provider_run.id
-            job_type = job.type
             input_json = dict(job.input_json)
             session.commit()
 
-        handler = get_job_handler(job_type)
-        result = handler(input_json, settings)
+        result = definition.handler(input_json, settings)
 
         with session_factory() as session:
             job_repository = JobRepository(session)
             job = job_repository.get_or_raise(job_id)
-            job_repository.mark_completed(job, result)
             provider_run_repository = ProviderRunRepository(session)
             provider_run = provider_run_repository.get(provider_run_id)
+            if job.status == "cancelled":
+                if provider_run is not None:
+                    provider_run_repository.mark_cancelled(provider_run)
+                session.commit()
+                return
+            if job.type == "scene_sequence.generate":
+                scene_count = result.get("scene_count")
+                if isinstance(scene_count, int) and scene_count > 0:
+                    job_repository.set_progress_total(job, scene_count + 1)
+            job_repository.mark_completed(job, result)
             if provider_run is not None:
                 provider_run_repository.mark_completed(
                     provider_run,
@@ -90,15 +141,15 @@ def execute_job(
                 )
             session.commit()
     except AppError as exc:
-        _mark_failed(session_factory, job_id, provider_run_id, exc.code, exc.message)
+        _record_failure(session_factory, settings, job_id, provider_run_id, exc.code, exc.message)
     except HTTPException as exc:
-        message = exc.detail if isinstance(exc.detail, str) else "Job provider request failed."
-        code = "provider_error" if exc.status_code >= 500 else "validation_error"
-        _mark_failed(session_factory, job_id, provider_run_id, code, message)
+        code, message = _http_error(exc)
+        _record_failure(session_factory, settings, job_id, provider_run_id, code, message)
     except Exception:
         logger.exception("job_execution_failed", extra={"job_id": job_id})
-        _mark_failed(
+        _record_failure(
             session_factory,
+            settings,
             job_id,
             provider_run_id,
             "internal_server_error",

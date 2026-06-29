@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-JobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+JobStatus = Literal["queued", "running", "completed", "failed", "cancelled", "retrying"]
 
 
 class JobAcceptedResponse(BaseModel):
@@ -25,6 +25,9 @@ class JobDetailResponse(BaseModel):
     status: JobStatus
     progress_current: int
     progress_total: int
+    attempt_count: int
+    max_attempts: int
+    next_retry_at: datetime | None
     result: dict[str, Any] | None
     error: JobErrorResponse | None
     created_at: datetime
@@ -36,3 +39,13 @@ class JobDetailResponse(BaseModel):
 class JobListResponse(BaseModel):
     jobs: list[JobDetailResponse]
     count: int
+
+
+class JobRecoveryResponse(BaseModel):
+    recovered_stale: int
+    requeued_due: int
+
+
+class JobCancellationResponse(BaseModel):
+    job_id: str
+    status: JobStatus

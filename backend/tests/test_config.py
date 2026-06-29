@@ -14,6 +14,10 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.queue_backend == "inline"
     assert settings.redis_url == "redis://localhost:6379/0"
     assert settings.job_default_timeout_seconds == 1800
+    assert settings.job_max_attempts == 3
+    assert settings.job_retry_backoff_seconds == 30
+    assert settings.job_stale_after_seconds == 900
+    assert settings.job_worker_id == "local-worker"
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:

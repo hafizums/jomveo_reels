@@ -1,5 +1,6 @@
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.models import ProviderRun, utc_now
@@ -30,6 +31,13 @@ class ProviderRunRepository:
     def get(self, provider_run_id: str) -> ProviderRun | None:
         return self.session.get(ProviderRun, provider_run_id)
 
+    def list_running_for_job(self, job_id: str) -> list[ProviderRun]:
+        statement = select(ProviderRun).where(
+            ProviderRun.job_id == job_id,
+            ProviderRun.status == "running",
+        )
+        return list(self.session.scalars(statement))
+
     def mark_completed(
         self,
         provider_run: ProviderRun,
@@ -43,4 +51,8 @@ class ProviderRunRepository:
         provider_run.status = "failed"
         provider_run.error_code = code
         provider_run.error_message = message
+        provider_run.updated_at = utc_now()
+
+    def mark_cancelled(self, provider_run: ProviderRun) -> None:
+        provider_run.status = "cancelled"
         provider_run.updated_at = utc_now()
