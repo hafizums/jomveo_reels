@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     queue_backend: str = "inline"
     redis_url: str = "redis://localhost:6379/0"
     job_default_timeout_seconds: int = 1800
+    job_max_attempts: int = 3
+    job_retry_backoff_seconds: int = 30
+    job_stale_after_seconds: int = 900
+    job_worker_id: str = "local-worker"
     log_level: str = "INFO"
     request_id_header: str = "X-Request-ID"
 

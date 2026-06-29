@@ -173,10 +173,22 @@ python -m ruff format --check backend/app backend/tests
 
 ## Persistent generation jobs
 
-Script generation also has a persistent job endpoint at
-`POST /api/jobs/scripts/generate`. The synchronous `POST /api/scripts/generate`
-endpoint remains available. Job state is available from `GET /api/jobs/{job_id}`
-and recent jobs from `GET /api/jobs?limit=20`.
+Persistent job endpoints are available for every JSON generation flow:
+
+- `POST /api/jobs/scripts/generate`
+- `POST /api/jobs/voiceovers/generate`
+- `POST /api/jobs/background-music/generate`
+- `POST /api/jobs/art-style/generate`
+- `POST /api/jobs/art-style/scenes/generate`
+- `POST /api/jobs/scene-animations/generate`
+- `POST /api/jobs/videos/generate`
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs?limit=20`
+- `POST /api/jobs/{job_id}/cancel`
+- `POST /api/jobs/recover-stale`
+
+The existing synchronous endpoints remain available. Multipart caption uploads
+remain synchronous until uploaded-file storage is hardened.
 
 The local defaults use SQLite and execute jobs inline. Configure the job system
 in `backend/.env` when Redis Queue execution is needed:
@@ -186,7 +198,25 @@ DATABASE_URL=sqlite:///backend/generated/jomveo.db
 QUEUE_BACKEND=inline
 REDIS_URL=redis://localhost:6379/0
 JOB_DEFAULT_TIMEOUT_SECONDS=1800
+JOB_MAX_ATTEMPTS=3
+JOB_RETRY_BACKOFF_SECONDS=30
+JOB_STALE_AFTER_SECONDS=900
+JOB_WORKER_ID=local-worker
 ```
+
+Retryable provider, timeout, bad-response, and unexpected worker errors move a
+job to `retrying` until its attempt limit is reached. The recovery endpoint
+requeues due retries and recovers stale running jobs. Authentication must be
+added to this administrative endpoint before a public production deployment.
+
+Inline mode executes the initial attempt in the API process. Retries deliberately
+wait for `POST /api/jobs/recover-stale` to avoid recursive inline execution. RQ
+mode also relies on recovery for delayed retries; an automatic scheduler is not
+included yet. Progress is coarse for scene and video jobs until generator-level
+callbacks are introduced.
+
+Production environments must run `alembic upgrade head` before starting the API.
+Automatic table creation is limited to local, development, and test environments.
 
 Common backend commands:
 
