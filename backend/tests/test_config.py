@@ -18,6 +18,14 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.job_retry_backoff_seconds == 30
     assert settings.job_stale_after_seconds == 900
     assert settings.job_worker_id == "local-worker"
+    assert settings.storage_backend == "local"
+    assert settings.local_storage_root.name == "generated"
+    assert settings.public_generated_url_prefix == "/generated"
+    assert settings.max_upload_bytes == 100 * 1024 * 1024
+    assert settings.max_remote_asset_bytes == 100 * 1024 * 1024
+    assert settings.remote_download_timeout_seconds == 60
+    assert settings.allow_private_network_downloads is False
+    assert settings.allowed_remote_asset_schemes == ["https", "http"]
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:

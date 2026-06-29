@@ -1,22 +1,24 @@
+import logging
 import shutil
 import subprocess
 import uuid
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlparse
 
-import httpx
-from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from backend.app.caption_style_generator import (
     CaptionStyleRequest,
     generate_caption_style_video,
 )
+from backend.app.core.config import Settings, get_settings
+from backend.app.core.errors import MediaProcessingError, ValidationAppError
+from backend.app.media.cleanup import cleanup_paths
+from backend.app.media.downloader import RemoteAssetDownloader
 
 VIDEO_OUTPUT_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "videos"
-MAX_ASSET_BYTES = 100 * 1024 * 1024
 FPS = 30
+logger = logging.getLogger(__name__)
 
 AspectRatio = Literal["9:16", "16:9", "1:1", "4:5"]
 VisualSource = Literal["stills", "animated"]
@@ -68,54 +70,16 @@ def _run_command(command: list[str], operation: str, timeout: int = 1800) -> Non
             timeout=timeout,
         )
     except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail="FFmpeg is not installed or is not available on PATH.",
-        ) from exc
+        raise MediaProcessingError("FFmpeg is not installed or available on PATH.") from exc
     except subprocess.TimeoutExpired as exc:
-        raise HTTPException(status_code=504, detail=f"Timed out while {operation}.") from exc
+        raise MediaProcessingError(f"Media processing timed out while {operation}.") from exc
     except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or exc.stdout or f"FFmpeg failed while {operation}.").strip()
-        raise HTTPException(status_code=502, detail=detail[-3000:]) from exc
-
-
-def _validate_remote_url(url: str, asset_name: str) -> None:
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{asset_name} must be a valid HTTP or HTTPS URL.",
+        logger.error(
+            "ffmpeg_failed operation=%s stderr=%s",
+            operation,
+            (exc.stderr or exc.stdout or "")[-3000:],
         )
-
-
-def _download_asset(client: httpx.Client, url: str, destination: Path, asset_name: str) -> None:
-    _validate_remote_url(url, asset_name)
-    try:
-        with client.stream("GET", url) as response:
-            response.raise_for_status()
-            content_length = response.headers.get("content-length")
-            if content_length and int(content_length) > MAX_ASSET_BYTES:
-                raise HTTPException(
-                    status_code=413, detail=f"{asset_name} exceeds the 100 MB limit."
-                )
-
-            downloaded = 0
-            with destination.open("wb") as output:
-                for chunk in response.iter_bytes():
-                    downloaded += len(chunk)
-                    if downloaded > MAX_ASSET_BYTES:
-                        raise HTTPException(
-                            status_code=413, detail=f"{asset_name} exceeds the 100 MB limit."
-                        )
-                    output.write(chunk)
-    except HTTPException:
-        destination.unlink(missing_ok=True)
-        raise
-    except (httpx.HTTPError, ValueError) as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=502, detail=f"Could not download {asset_name}: {exc}"
-        ) from exc
+        raise MediaProcessingError(f"Media processing failed while {operation}.") from exc
 
 
 def _render_scene_segment(
@@ -265,39 +229,64 @@ def _mix_audio(
     _run_command(command, "mixing narration and background music")
 
 
-def generate_video(payload: VideoGenerationRequest) -> VideoGenerationResponse:
+def generate_video(
+    payload: VideoGenerationRequest,
+    *,
+    downloader: RemoteAssetDownloader | None = None,
+    settings: Settings | None = None,
+) -> VideoGenerationResponse:
+    settings = settings or get_settings()
     if not shutil.which("ffmpeg"):
-        raise HTTPException(status_code=500, detail="FFmpeg is not installed or available on PATH.")
+        raise MediaProcessingError("FFmpeg is not installed or available on PATH.")
 
     source_urls = payload.video_urls if payload.visual_source == "animated" else payload.image_urls
     if not source_urls:
         source_label = (
             "animated scene videos" if payload.visual_source == "animated" else "scene images"
         )
-        raise HTTPException(status_code=400, detail=f"Video creation requires {source_label}.")
+        raise ValidationAppError(f"Video creation requires {source_label}.")
 
     job_id = uuid.uuid4().hex[:12]
-    job_directory = VIDEO_OUTPUT_DIRECTORY / job_id
+    video_output_directory = settings.local_storage_root / "videos"
+    job_directory = video_output_directory / job_id
     assets_directory = job_directory / "assets"
     segments_directory = job_directory / "segments"
     assets_directory.mkdir(parents=True, exist_ok=False)
     segments_directory.mkdir(parents=True, exist_ok=True)
 
-    source_suffix = "video" if payload.visual_source == "animated" else "image"
-    source_paths = [
-        assets_directory / f"scene-{index:02d}.{source_suffix}"
-        for index in range(1, len(source_urls) + 1)
-    ]
-    voiceover_path = assets_directory / "voiceover.audio"
-    music_path = assets_directory / "music.audio" if payload.music_url.strip() else None
-
-    timeout = httpx.Timeout(connect=30.0, read=180.0, write=30.0, pool=30.0)
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-        for index, (url, path) in enumerate(zip(source_urls, source_paths), start=1):
-            _download_asset(client, url, path, f"scene {source_suffix} {index}")
-        _download_asset(client, payload.voiceover_url, voiceover_path, "voiceover")
-        if music_path:
-            _download_asset(client, payload.music_url, music_path, "background music")
+    owns_downloader = downloader is None
+    downloader = downloader or RemoteAssetDownloader(settings)
+    source_kind = "video" if payload.visual_source == "animated" else "image"
+    source_paths: list[Path] = []
+    try:
+        for index, url in enumerate(source_urls, start=1):
+            source_paths.append(
+                downloader.download(
+                    url,
+                    assets_directory / f"scene-{index:02d}.asset",
+                    source_kind,
+                )
+            )
+        voiceover_path = downloader.download(
+            payload.voiceover_url,
+            assets_directory / "voiceover.asset",
+            "audio",
+        )
+        music_path = (
+            downloader.download(
+                payload.music_url,
+                assets_directory / "music.asset",
+                "audio",
+            )
+            if payload.music_url.strip()
+            else None
+        )
+    except Exception:
+        cleanup_paths([job_directory], video_output_directory)
+        raise
+    finally:
+        if owns_downloader:
+            downloader.close()
 
     width, height = ASPECT_DIMENSIONS[payload.aspect_ratio]
     total_frames = payload.duration_seconds * FPS
@@ -334,7 +323,8 @@ def generate_video(payload: VideoGenerationRequest) -> VideoGenerationResponse:
             language_hint=payload.language_hint,
             style_name=payload.caption_style_name,
             output_basename=f"video-{job_id}-final",
-        )
+        ),
+        settings=settings,
     )
     output_path = Path(caption_result.output_path)
     output_url = caption_result.output_url

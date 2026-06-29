@@ -108,7 +108,11 @@ def _patch_generators(monkeypatch) -> None:
         "generate_scene_animations",
         provider_result("scene_animation"),
     )
-    monkeypatch.setattr(registry, "generate_video", lambda _payload: StubResult("video"))
+    monkeypatch.setattr(
+        registry,
+        "generate_video",
+        lambda _payload, **_kwargs: StubResult("video"),
+    )
 
 
 @pytest.fixture
