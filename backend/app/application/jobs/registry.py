@@ -74,7 +74,7 @@ def execute_scene_animation_generation(
 
 def execute_video_generation(input_json: dict[str, Any], _settings: Settings) -> dict[str, Any]:
     payload = VideoGenerationRequest.model_validate(input_json)
-    return generate_video(payload).model_dump(mode="json")
+    return generate_video(payload, settings=_settings).model_dump(mode="json")
 
 
 JOB_REGISTRY: dict[str, JobDefinition] = {

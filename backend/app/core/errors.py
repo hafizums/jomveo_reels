@@ -45,3 +45,29 @@ class ValidationAppError(AppError):
 class JobNotFoundError(AppError):
     status_code = 404
     code = "job_not_found"
+
+
+class StorageError(AppError):
+    code = "storage_error"
+
+
+class UnsafePathError(StorageError):
+    status_code = 400
+    code = "unsafe_path"
+
+
+class UploadValidationError(ValidationAppError):
+    code = "upload_validation_error"
+
+
+class RemoteDownloadError(AppError):
+    status_code = 502
+    code = "remote_download_error"
+
+
+class UnsafeRemoteURLError(ValidationAppError):
+    code = "unsafe_remote_url"
+
+
+class MediaValidationError(ValidationAppError):
+    code = "media_validation_error"

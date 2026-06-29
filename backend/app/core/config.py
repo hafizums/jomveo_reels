@@ -22,6 +22,14 @@ class Settings(BaseSettings):
         ]
     )
     generated_root: Path = BACKEND_ROOT / "generated"
+    storage_backend: str = "local"
+    local_storage_root: Path = BACKEND_ROOT / "generated"
+    public_generated_url_prefix: str = "/generated"
+    max_upload_bytes: int = 100 * 1024 * 1024
+    max_remote_asset_bytes: int = 100 * 1024 * 1024
+    remote_download_timeout_seconds: int = 60
+    allow_private_network_downloads: bool = False
+    allowed_remote_asset_schemes: list[str] = Field(default_factory=lambda: ["https", "http"])
     database_url: str = "sqlite:///backend/generated/jomveo.db"
     queue_backend: str = "inline"
     redis_url: str = "redis://localhost:6379/0"
@@ -55,7 +63,7 @@ class Settings(BaseSettings):
             return False
         return value
 
-    @field_validator("generated_root")
+    @field_validator("generated_root", "local_storage_root")
     @classmethod
     def resolve_generated_root(cls, value: Path) -> Path:
         return value if value.is_absolute() else BACKEND_ROOT / value

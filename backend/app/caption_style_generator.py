@@ -1,19 +1,28 @@
+import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 from pydantic import BaseModel, Field
+
+from backend.app.core.config import Settings, get_settings
+from backend.app.core.errors import MediaProcessingError, UploadValidationError, ValidationAppError
+from backend.app.media.validation import validate_upload_file
+from backend.app.storage.base import StorageBackend
+from backend.app.storage.local import LocalStorageBackend
+from backend.app.storage.paths import make_object_key, sanitize_filename
 
 DEFAULT_CAPTION_TEMPLATE = "minimalist"
 DEFAULT_TRANSCRIPT_FORMAT = "auto"
 OUTPUT_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "captions"
 UPLOAD_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "uploads" / "captions"
+logger = logging.getLogger(__name__)
 
 
 class CaptionStyleRequest(BaseModel):
@@ -44,17 +53,11 @@ def _sanitize_basename(value: str) -> str:
     return slug or "captioned-video"
 
 
-def _sanitize_filename(value: str) -> str:
-    filename = Path(value).name
-    stem = _sanitize_basename(Path(filename).stem)
-    suffix = Path(filename).suffix.lower()
-    return f"{stem}{suffix}"
-
-
-def _resolve_output_path(request: CaptionStyleRequest) -> Path:
-    OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+def _resolve_output_path(request: CaptionStyleRequest, settings: Settings) -> Path:
+    output_directory = settings.local_storage_root / "captions"
+    output_directory.mkdir(parents=True, exist_ok=True)
     basename = request.output_basename or request.style_name or request.template_name
-    return OUTPUT_DIRECTORY / f"{_sanitize_basename(basename)}.mp4"
+    return output_directory / f"{_sanitize_basename(basename)}.mp4"
 
 
 def _resolve_pycaps_command() -> list[str]:
@@ -86,39 +89,69 @@ def _build_command(request: CaptionStyleRequest, output_path: Path) -> list[str]
     return command
 
 
-def save_uploaded_file(upload: UploadFile, category: str) -> Path:
-    if not upload.filename:
-        raise HTTPException(status_code=400, detail="Uploaded file is missing a filename.")
+def save_uploaded_file(
+    upload: UploadFile,
+    category: str,
+    *,
+    storage: StorageBackend | None = None,
+    settings: Settings | None = None,
+) -> Path:
+    settings = settings or get_settings()
+    storage = storage or LocalStorageBackend(
+        settings.local_storage_root,
+        settings.public_generated_url_prefix,
+    )
+    try:
+        kind = {"videos": "video", "transcripts": "transcript"}[category]
+    except KeyError as exc:
+        raise ValidationAppError("Unsupported upload category.") from exc
+    validated = validate_upload_file(upload, kind, settings.max_upload_bytes)
+    filename = f"{uuid.uuid4().hex[:8]}-{sanitize_filename(validated.filename)}"
+    key = make_object_key(f"uploads/captions/{category}", filename)
 
-    destination_directory = UPLOAD_DIRECTORY / category
-    destination_directory.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        settings.local_storage_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            dir=settings.local_storage_root,
+            prefix="caption-upload-",
+            suffix=".part",
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            copied = 0
+            upload.file.seek(0)
+            while chunk := upload.file.read(1024 * 1024):
+                copied += len(chunk)
+                if copied > settings.max_upload_bytes:
+                    raise UploadValidationError("Uploaded file exceeds the configured size limit.")
+                temporary.write(chunk)
+        stored = storage.save_file(key, temporary_path, validated.content_type)
+        return storage.open_path(stored.key)
+    finally:
+        upload.file.seek(0)
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
-    sanitized_name = _sanitize_filename(upload.filename)
-    destination = destination_directory / f"{uuid.uuid4().hex[:8]}-{sanitized_name}"
 
-    upload.file.seek(0)
-    with destination.open("wb") as output_file:
-        shutil.copyfileobj(upload.file, output_file)
-    return destination
-
-
-def generate_caption_style_video(request: CaptionStyleRequest) -> CaptionStyleResponse:
+def generate_caption_style_video(
+    request: CaptionStyleRequest,
+    *,
+    settings: Settings | None = None,
+) -> CaptionStyleResponse:
+    settings = settings or get_settings()
     input_path = Path(request.input_video_path)
     if not input_path.exists():
-        raise HTTPException(
-            status_code=400, detail=f"Input video not found: {request.input_video_path}"
-        )
+        raise ValidationAppError("Input video was not found.")
 
     if request.transcript_path.strip() and not Path(request.transcript_path).exists():
-        raise HTTPException(
-            status_code=400, detail=f"Transcript not found: {request.transcript_path}"
-        )
+        raise ValidationAppError("Transcript was not found.")
 
-    output_path = _resolve_output_path(request)
+    output_path = _resolve_output_path(request, settings)
     command = _build_command(request, output_path)
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             command,
             check=True,
             capture_output=True,
@@ -126,31 +159,20 @@ def generate_caption_style_video(request: CaptionStyleRequest) -> CaptionStyleRe
             timeout=1800,
         )
     except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "pycaps is not installed or not available on PATH. Install it from the GitHub repo "
-                "and run `playwright install chromium` before using the caption module."
-            ),
+        raise MediaProcessingError(
+            "Caption rendering is unavailable because pycaps is not installed."
         ) from exc
     except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or "").strip()
-        stdout = (exc.stdout or "").strip()
-        detail = stderr or stdout or "pycaps render failed."
-        raise HTTPException(status_code=502, detail=detail) from exc
+        logger.error("caption_render_failed: %s", (exc.stderr or "")[-3000:])
+        raise MediaProcessingError("Caption rendering failed.") from exc
     except subprocess.TimeoutExpired as exc:
-        raise HTTPException(
-            status_code=504,
-            detail="Timed out waiting for pycaps to finish rendering the captioned video.",
-        ) from exc
+        raise MediaProcessingError("Caption rendering timed out.") from exc
 
     if not output_path.exists():
-        raise HTTPException(
-            status_code=502,
-            detail="pycaps finished without producing the expected output video file.",
-        )
+        raise MediaProcessingError("Caption rendering did not produce an output file.")
 
-    output_url = f"/generated/captions/{output_path.name}"
+    url_prefix = settings.public_generated_url_prefix.rstrip("/")
+    output_url = f"{url_prefix}/captions/{output_path.name}"
     return CaptionStyleResponse(
         input_video_path=request.input_video_path,
         template_name=request.template_name,
@@ -161,8 +183,5 @@ def generate_caption_style_video(request: CaptionStyleRequest) -> CaptionStyleRe
         output_path=str(output_path),
         output_url=output_url,
         command=command,
-        raw_output={
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        },
+        raw_output={"rendered": True},
     )

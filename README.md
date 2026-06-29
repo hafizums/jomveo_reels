@@ -188,7 +188,7 @@ Persistent job endpoints are available for every JSON generation flow:
 - `POST /api/jobs/recover-stale`
 
 The existing synchronous endpoints remain available. Multipart caption uploads
-remain synchronous until uploaded-file storage is hardened.
+remain synchronous while job-owned upload retention and cleanup are finalized.
 
 The local defaults use SQLite and execute jobs inline. Configure the job system
 in `backend/.env` when Redis Queue execution is needed:
@@ -217,6 +217,38 @@ callbacks are introduced.
 
 Production environments must run `alembic upgrade head` before starting the API.
 Automatic table creation is limited to local, development, and test environments.
+
+## Local media storage and validation
+
+Generated media and validated uploads use the local storage backend under
+`backend/generated` by default and are served from `/generated`. Storage keys reject
+absolute paths, traversal, Windows drive paths, and unsafe path characters. Production
+deployments should eventually move public media serving behind object storage and a CDN.
+
+Uploads default to a 100 MB limit. Caption video uploads accept MP4, WebM, and QuickTime
+files. Transcript uploads accept `.srt`, `.vtt`, `.json`, and `.txt`. Declared content
+types, extensions, and basic file signatures are checked before files are persisted.
+
+Remote video-assembly assets are limited to HTTP and HTTPS, bounded to 100 MB, and
+validated by media signature. URLs with credentials are rejected. DNS results in private,
+loopback, link-local, multicast, reserved, or unspecified networks are blocked on every
+redirect unless private downloads are explicitly enabled.
+
+```env
+STORAGE_BACKEND=local
+LOCAL_STORAGE_ROOT=generated
+PUBLIC_GENERATED_URL_PREFIX=/generated
+MAX_UPLOAD_BYTES=104857600
+MAX_REMOTE_ASSET_BYTES=104857600
+REMOTE_DOWNLOAD_TIMEOUT_SECONDS=60
+ALLOW_PRIVATE_NETWORK_DOWNLOADS=false
+ALLOWED_REMOTE_ASSET_SCHEMES='["https","http"]'
+```
+
+`POST /api/caption-style/generate` remains synchronous. Its uploads are now safely
+persisted, but the optional caption job route is deferred until job-specific retention
+and cleanup policies are available. Recovery and cancellation endpoints remain
+unauthenticated development tools and must be protected before public deployment.
 
 Common backend commands:
 
