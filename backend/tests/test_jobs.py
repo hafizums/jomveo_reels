@@ -71,7 +71,7 @@ class StubResult:
 
 
 def _patch_generators(monkeypatch) -> None:
-    def fake_script(api_key: str, payload: ScriptRequest) -> ScriptResponse:
+    def fake_script(api_key: str, payload: ScriptRequest, **_kwargs) -> ScriptResponse:
         assert api_key == "worker-only-secret"
         return ScriptResponse(
             **payload.model_dump(),
@@ -83,7 +83,7 @@ def _patch_generators(monkeypatch) -> None:
         )
 
     def provider_result(kind: str):
-        def generate(api_key: str, _payload: object) -> StubResult:
+        def generate(api_key: str, _payload: object, **_kwargs) -> StubResult:
             assert api_key == "worker-only-secret"
             extra = {"scene_count": 2} if kind == "scene_sequence" else {}
             return StubResult(kind, **extra)
@@ -208,7 +208,7 @@ def test_job_input_and_provider_summary_do_not_store_api_key(job_app) -> None:
 def test_retryable_failure_increments_attempt_and_waits_for_recovery(job_app, monkeypatch) -> None:
     client, _application = job_app
 
-    def fail_generation(_api_key: str, _payload: ScriptRequest) -> ScriptResponse:
+    def fail_generation(_api_key: str, _payload: ScriptRequest, **_kwargs) -> ScriptResponse:
         raise ProviderError("Provider temporarily unavailable.")
 
     monkeypatch.setattr(registry, "generate_video_script", fail_generation)
@@ -228,7 +228,7 @@ def test_exhausted_retryable_failure_becomes_failed(job_app, monkeypatch) -> Non
     client, application = job_app
     application.state.settings.job_max_attempts = 1
 
-    def fail_generation(_api_key: str, _payload: ScriptRequest) -> ScriptResponse:
+    def fail_generation(_api_key: str, _payload: ScriptRequest, **_kwargs) -> ScriptResponse:
         raise ProviderError("Provider remains unavailable.")
 
     monkeypatch.setattr(registry, "generate_video_script", fail_generation)
@@ -243,7 +243,7 @@ def test_exhausted_retryable_failure_becomes_failed(job_app, monkeypatch) -> Non
 def test_non_retryable_configuration_error_fails_immediately(job_app, monkeypatch) -> None:
     client, _application = job_app
 
-    def fail_generation(_api_key: str, _payload: ScriptRequest) -> ScriptResponse:
+    def fail_generation(_api_key: str, _payload: ScriptRequest, **_kwargs) -> ScriptResponse:
         raise ConfigurationError("Worker configuration is invalid.")
 
     monkeypatch.setattr(registry, "generate_video_script", fail_generation)

@@ -26,6 +26,10 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.remote_download_timeout_seconds == 60
     assert settings.allow_private_network_downloads is False
     assert settings.allowed_remote_asset_schemes == ["https", "http"]
+    assert settings.wavespeed_provider_mode == "sdk"
+    assert settings.wavespeed_sdk_timeout_seconds == 36000
+    assert settings.wavespeed_sdk_poll_interval_seconds == 1
+    assert settings.wavespeed_sdk_enable_sync_mode is False
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:

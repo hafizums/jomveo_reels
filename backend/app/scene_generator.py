@@ -13,7 +13,9 @@ from backend.app.art_style_generator import (
     ArtStyleRequest,
     generate_art_style_image,
 )
-from backend.app.core.config import get_settings
+from backend.app.core.config import Settings, get_settings
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.infrastructure.providers.wavespeed.client import WaveSpeedProviderClient
 
 LLM_BASE_URL = get_settings().wavespeed_llm_base_url
 DEFAULT_SCENE_PLANNER_MODEL = "openai/gpt-5.4-mini"
@@ -207,7 +209,12 @@ def _generate_scene_plan(api_key: str, payload: SceneSequenceRequest) -> list[Pl
 def generate_scene_sequence(
     api_key: str,
     payload: SceneSequenceRequest,
+    *,
+    provider_client: WaveSpeedProviderClient | None = None,
+    settings: Settings | None = None,
 ) -> SceneSequenceResponse:
+    settings = settings or get_settings()
+    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
     planned_scenes = _generate_scene_plan(api_key, payload)
     scene_count = len(planned_scenes)
 
@@ -222,6 +229,8 @@ def generate_scene_sequence(
                 model=payload.model,
                 enable_safety_checker=payload.enable_safety_checker,
             ),
+            provider_client=provider_client,
+            settings=settings,
         )
         return GeneratedScene(
             scene_number=scene_number,

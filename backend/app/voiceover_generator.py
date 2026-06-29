@@ -1,10 +1,14 @@
 from typing import Any
 
-import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
+from backend.app.core.config import Settings, get_settings
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.infrastructure.providers.wavespeed.client import (
+    WaveSpeedProviderClient,
+    extract_first_asset_url,
+)
 
 DEFAULT_VOICEOVER_MODEL = "elevenlabs/multilingual-v2"
 GEMINI_FLASH_TTS_MODEL = "google/gemini-2.5-flash/text-to-speech"
@@ -75,7 +79,15 @@ class VoiceoverResponse(BaseModel):
     raw_output: dict[str, Any]
 
 
-def generate_voiceover(api_key: str, payload: VoiceoverRequest) -> VoiceoverResponse:
+def generate_voiceover(
+    api_key: str,
+    payload: VoiceoverRequest,
+    *,
+    provider_client: WaveSpeedProviderClient | None = None,
+    settings: Settings | None = None,
+) -> VoiceoverResponse:
+    settings = settings or get_settings()
+    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Voiceover text cannot be empty.")
 
@@ -109,26 +121,9 @@ def generate_voiceover(api_key: str, payload: VoiceoverRequest) -> VoiceoverResp
             "use_speaker_boost": payload.use_speaker_boost,
         }
 
-    with httpx.Client(timeout=30.0) as client:
-        submitted = submit_prediction(
-            client,
-            api_key,
-            payload.model,
-            provider_payload,
-        )
-        output = poll_prediction(
-            client,
-            api_key,
-            submitted["urls"]["get"],
-            timeout_detail="Timed out waiting for WaveSpeed to finish generating the voiceover.",
-        )
+    output = provider_client.run_model(payload.model, provider_payload)
 
-    audio_url = extract_asset_url(output.get("outputs"))
-    if not audio_url:
-        raise HTTPException(
-            status_code=502,
-            detail="WaveSpeed response did not include an audio URL.",
-        )
+    audio_url = extract_first_asset_url(output)
 
     return VoiceoverResponse(
         text=payload.text,

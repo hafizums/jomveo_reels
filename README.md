@@ -250,6 +250,39 @@ persisted, but the optional caption job route is deferred until job-specific ret
 and cleanup policies are available. Recovery and cancellation endpoints remain
 unauthenticated development tools and must be protected before public deployment.
 
+## WaveSpeed provider integration
+
+Model inference uses the official
+[WaveSpeed Python SDK](https://github.com/WaveSpeedAI/wavespeed-python)
+(`>=1.0.9,<2`) by default.
+The provider wrapper keeps SDK response normalization and safe exception mapping out of
+the generator modules. Set the provider mode in `backend/.env`:
+
+```env
+WAVESPEED_PROVIDER_MODE=sdk
+WAVESPEED_SDK_TIMEOUT_SECONDS=36000
+WAVESPEED_SDK_POLL_INTERVAL_SECONDS=1
+WAVESPEED_SDK_ENABLE_SYNC_MODE=false
+```
+
+Current provider classification:
+
+- SDK run-model adapter: art-style images, image moderation, voiceovers, background
+  music, scene images, and scene animations.
+- Legacy OpenAI-compatible HTTP: script generation and scene planning. The official SDK
+  exposes model run/upload APIs, but not the separate `/v1/chat/completions` contract.
+- Local processing: video assembly and captions do not call WaveSpeed.
+
+For rollback of model inference only, use:
+
+```env
+WAVESPEED_PROVIDER_MODE=legacy_http
+```
+
+The legacy mode retains the previous submit/poll implementation. Chat-completion flows
+remain legacy in either mode. The SDK serverless-worker features are intentionally not
+used by this application.
+
 Common backend commands:
 
 ```bash

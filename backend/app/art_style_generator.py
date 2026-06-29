@@ -1,10 +1,13 @@
 from typing import Any
 
-import httpx
-from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
+from backend.app.core.config import Settings, get_settings
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.infrastructure.providers.wavespeed.client import (
+    WaveSpeedProviderClient,
+    extract_first_asset_url,
+)
 
 DEFAULT_ART_STYLE_MODEL = "google/nano-banana/text-to-image"
 Z_IMAGE_TURBO_MODEL = "wavespeed-ai/z-image/turbo"
@@ -38,52 +41,34 @@ def _build_styled_prompt(payload: ArtStyleRequest) -> str:
     )
 
 
-def generate_art_style_image(api_key: str, payload: ArtStyleRequest) -> ArtStyleResponse:
+def generate_art_style_image(
+    api_key: str,
+    payload: ArtStyleRequest,
+    *,
+    provider_client: WaveSpeedProviderClient | None = None,
+    settings: Settings | None = None,
+) -> ArtStyleResponse:
+    settings = settings or get_settings()
+    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
     styled_prompt = _build_styled_prompt(payload)
     model_payload: dict[str, Any] = {"prompt": styled_prompt}
     if payload.model == Z_IMAGE_TURBO_MODEL:
         model_payload["size"] = "864*1536"
 
-    with httpx.Client(timeout=30.0) as client:
-        submitted = submit_prediction(
-            client,
-            api_key,
-            payload.model,
-            model_payload,
-        )
-        output = poll_prediction(
-            client,
-            api_key,
-            submitted["urls"]["get"],
-            timeout_detail="Timed out waiting for WaveSpeed to finish generating the art-style image.",
-        )
+    output = provider_client.run_model(payload.model, model_payload)
 
-    image_url = extract_asset_url(output.get("outputs"))
-    if not image_url:
-        raise HTTPException(
-            status_code=502,
-            detail="WaveSpeed response did not include an art-style image URL.",
-        )
+    image_url = extract_first_asset_url(output)
 
     safety_output: Any | None = None
     if payload.enable_safety_checker:
-        with httpx.Client(timeout=30.0) as client:
-            safety_submitted = submit_prediction(
-                client,
-                api_key,
-                IMAGE_SAFETY_MODEL,
-                {
-                    "image": image_url,
-                    "text": payload.prompt,
-                },
-            )
-            safety_result = poll_prediction(
-                client,
-                api_key,
-                safety_submitted["urls"]["get"],
-                timeout_detail="Timed out waiting for the image safety check.",
-            )
-            safety_output = safety_result.get("outputs")
+        safety_result = provider_client.run_model(
+            IMAGE_SAFETY_MODEL,
+            {
+                "image": image_url,
+                "text": payload.prompt,
+            },
+        )
+        safety_output = safety_result.get("outputs")
 
     return ArtStyleResponse(
         prompt=payload.prompt,

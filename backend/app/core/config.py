@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     wavespeed_api_key: str = ""
     wavespeed_llm_base_url: str = "https://llm.wavespeed.ai/v1"
     wavespeed_api_base_url: str = "https://api.wavespeed.ai/api/v3"
+    wavespeed_provider_mode: str = "sdk"
+    wavespeed_sdk_timeout_seconds: float = 36000.0
+    wavespeed_sdk_poll_interval_seconds: float = 1.0
+    wavespeed_sdk_enable_sync_mode: bool = False
     cors_allowed_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",

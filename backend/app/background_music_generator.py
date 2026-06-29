@@ -1,10 +1,12 @@
 from typing import Any
 
-import httpx
-from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.wavespeed_api import extract_asset_url, poll_prediction, submit_prediction
+from backend.app.core.config import Settings, get_settings
+from backend.app.core.errors import ProviderBadResponseError
+from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.infrastructure.providers.wavespeed.client import WaveSpeedProviderClient
+from backend.app.wavespeed_api import extract_asset_url
 
 DEFAULT_BACKGROUND_MUSIC_MODEL = "mureka-ai/mureka-v9/generate-bgm"
 DEFAULT_OUTPUT_FORMAT = "mp3"
@@ -49,30 +51,25 @@ def _extract_audio_urls(value: Any) -> list[str]:
 def generate_background_music(
     api_key: str,
     payload: BackgroundMusicRequest,
+    *,
+    provider_client: WaveSpeedProviderClient | None = None,
+    settings: Settings | None = None,
 ) -> BackgroundMusicResponse:
-    with httpx.Client(timeout=30.0) as client:
-        submitted = submit_prediction(
-            client,
-            api_key,
-            payload.model,
-            {
-                "prompt": payload.prompt,
-                "number_of_songs": payload.number_of_songs,
-                "output_format": payload.output_format,
-            },
-        )
-        output = poll_prediction(
-            client,
-            api_key,
-            submitted["urls"]["get"],
-            timeout_detail="Timed out waiting for WaveSpeed to finish generating the background music.",
-        )
+    settings = settings or get_settings()
+    provider_client = provider_client or create_wavespeed_provider_client(settings, api_key=api_key)
+    output = provider_client.run_model(
+        payload.model,
+        {
+            "prompt": payload.prompt,
+            "number_of_songs": payload.number_of_songs,
+            "output_format": payload.output_format,
+        },
+    )
 
     audio_urls = _extract_audio_urls(output.get("outputs"))
     if not audio_urls:
-        raise HTTPException(
-            status_code=502,
-            detail="WaveSpeed response did not include any background music URLs.",
+        raise ProviderBadResponseError(
+            "WaveSpeed response did not include any background music URLs."
         )
 
     return BackgroundMusicResponse(

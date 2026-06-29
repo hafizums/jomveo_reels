@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from backend.app.api.dependencies import require_wavespeed_api_key
 from backend.app.background_music_generator import (
@@ -15,6 +15,7 @@ router = APIRouter()
 @router.post("/generate", response_model=BackgroundMusicResponse)
 def create_background_music(
     payload: BackgroundMusicRequest,
+    request: Request,
     api_key: Annotated[str, Depends(require_wavespeed_api_key)],
 ) -> BackgroundMusicResponse:
-    return generate_background_music(api_key, payload)
+    return generate_background_music(api_key, payload, settings=request.app.state.settings)
