@@ -10,10 +10,10 @@ from backend.app.infrastructure.providers.wavespeed.client import (
     extract_first_asset_url,
 )
 
-DEFAULT_VOICEOVER_MODEL = "elevenlabs/multilingual-v2"
 GEMINI_FLASH_TTS_MODEL = "google/gemini-2.5-flash/text-to-speech"
-DEFAULT_VOICE_ID = "Lily"
-DEFAULT_VOICE_LANGUAGE = "English"
+DEFAULT_VOICEOVER_MODEL = GEMINI_FLASH_TTS_MODEL
+DEFAULT_VOICE_ID = "Achernar"
+DEFAULT_VOICE_LANGUAGE = "English (United States)"
 DEFAULT_SIMILARITY = 0.85
 DEFAULT_STABILITY = 0.45
 DEFAULT_USE_SPEAKER_BOOST = True

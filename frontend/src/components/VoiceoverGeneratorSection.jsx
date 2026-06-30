@@ -26,7 +26,7 @@ export default function VoiceoverGeneratorSection({
     <section className="stack">
       <SectionHeading
         title="Voiceover Generator"
-        description="Turn your script into narration with ElevenLabs or Gemini 2.5 Flash TTS on WaveSpeed."
+        description="Turn your script into narration with Gemini 2.5 Flash TTS on WaveSpeed."
       />
 
       {!isGemini ? (
@@ -100,7 +100,7 @@ export default function VoiceoverGeneratorSection({
           ) : (
             <>
               <p className="helper-text">
-                ElevenLabs uses a valid voice ID plus optional similarity and stability controls.
+                This model uses a voice ID plus optional similarity and stability controls.
               </p>
               <label>
                 Gender

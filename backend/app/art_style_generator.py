@@ -9,8 +9,8 @@ from backend.app.infrastructure.providers.wavespeed.client import (
     extract_first_asset_url,
 )
 
-DEFAULT_ART_STYLE_MODEL = "google/nano-banana/text-to-image"
 Z_IMAGE_TURBO_MODEL = "wavespeed-ai/z-image/turbo"
+DEFAULT_ART_STYLE_MODEL = Z_IMAGE_TURBO_MODEL
 IMAGE_SAFETY_MODEL = "wavespeed-ai/content-moderator/image"
 
 

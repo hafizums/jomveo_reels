@@ -1,8 +1,6 @@
-export const ELEVENLABS_VOICE_MODEL = "elevenlabs/multilingual-v2";
 export const GEMINI_FLASH_TTS_MODEL = "google/gemini-2.5-flash/text-to-speech";
 
 export const voiceModelOptions = [
-  { value: ELEVENLABS_VOICE_MODEL, label: "ElevenLabs Multilingual V2" },
   { value: GEMINI_FLASH_TTS_MODEL, label: "Gemini 2.5 Flash TTS" },
 ];
 

@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import GeneratorTabs from "./components/GeneratorTabs";
 import CaptionStyleSection from "./components/CaptionStyleSection";
@@ -24,7 +24,7 @@ import {
   artStylePresets,
   defaultArtStylePreset,
 } from "./data/artStylePresets";
-import { artModelOptions } from "./data/artModels";
+import { artModelOptions, Z_IMAGE_TURBO_MODEL } from "./data/artModels";
 import { supportedLanguages } from "./data/languages";
 import {
   backgroundMusicVariants,
@@ -49,7 +49,6 @@ import {
   voiceStyles,
 } from "./data/voiceStyles";
 import {
-  ELEVENLABS_VOICE_MODEL,
   GEMINI_FLASH_TTS_MODEL,
   geminiLanguageOptions,
   geminiVoiceOptions,
@@ -72,14 +71,14 @@ const initialScriptForm = {
 
 const initialVoiceForm = {
   text: "",
-  style_name: defaultVoiceStyle.name,
+  style_name: "Gemini Narrator",
   gender: "Female",
-  voice_id: getVoiceId(defaultVoiceStyle, "Female"),
+  voice_id: "Achernar",
   similarity: 0.85,
   stability: 0.45,
   use_speaker_boost: true,
-  model: ELEVENLABS_VOICE_MODEL,
-  language: "English",
+  model: GEMINI_FLASH_TTS_MODEL,
+  language: "English (United States)",
   speaker_name: "Narrator",
 };
 
@@ -95,7 +94,7 @@ const initialArtForm = {
   prompt: "A lone investigator studying classified files in a dim archive room",
   style_name: defaultArtStylePreset.title,
   art_direction: defaultArtStylePreset.artDirection,
-  model: "google/nano-banana/text-to-image",
+  model: Z_IMAGE_TURBO_MODEL,
   enable_safety_checker: true,
 };
 
@@ -127,6 +126,7 @@ const initialSceneAnimationForm = {
 };
 
 export default function App() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("scripts");
   const [selectedProjectId, setSelectedProjectId] = useState(
     localStorage.getItem("jomveo.selectedProjectId") || defaultProjectId,
@@ -178,6 +178,15 @@ export default function App() {
       localStorage.setItem("jomveo.selectedProjectId", projectId);
     }
   }, []);
+
+  useEffect(() => {
+    if (location.pathname !== "/generate" || selectedProjectId) return undefined;
+    let active = true;
+    backend.projects().then(data => {
+      if (active && data.projects[0]) selectProject(data.projects[0].id);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [location.pathname, selectProject, selectedProjectId]);
 
   const selectedPreset =
     scriptPresets.find((preset) => preset.id === selectedPresetId) ?? defaultScriptPreset;
@@ -694,17 +703,36 @@ export default function App() {
 
   const queueProjectJob = async (requestedKind) => {
     setQueueError(""); setQueueMessage("");
-    if (!selectedProjectId) return setQueueError("Please select or create a project before queueing a project job.");
+    let projectId = selectedProjectId;
+    if (!projectId) {
+      try {
+        setQueueLoading(true);
+        const data = await backend.projects();
+        projectId = data.projects[0]?.id || "";
+        if (projectId) selectProject(projectId);
+      } catch (error) {
+        setQueueError(error.message);
+        setQueueLoading(false);
+        return;
+      }
+    }
+    if (!projectId) {
+      setQueueError("Please select or create a project before queueing a project job.");
+      setQueueLoading(false);
+      return;
+    }
     const configuration = queueConfiguration(requestedKind);
     if (!configuration) {
-      return setQueueError(
+      setQueueLoading(false);
+      setQueueError(
         activeTab === "voiceover"
           ? "Enter voiceover text before queueing this project job."
           : "Generate the required source content before queueing this project job.",
       );
+      return;
     }
     try {
-      setQueueLoading(true); const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, selectedProjectId);
+      setQueueLoading(true); const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, projectId);
       setQueueMessage(`Queued project job ${accepted.job_id}.`); setDashboardRefresh(value => value + 1);
     } catch (error) { setQueueError(error.message); } finally { setQueueLoading(false); }
   };

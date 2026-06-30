@@ -22,7 +22,7 @@ export default function ArtStyleSection({
     <section className="stack">
       <SectionHeading
         title="Art Style"
-        description="Generate styled visuals with Nano Banana using predefined art directions matched to your story niches."
+        description="Generate styled visuals with Z Image Turbo using predefined art directions matched to your story niches."
       />
 
       <ArtStylePresetPicker

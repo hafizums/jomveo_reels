@@ -1,10 +1,8 @@
+export const Z_IMAGE_TURBO_MODEL = "wavespeed-ai/z-image/turbo";
+
 export const artModelOptions = [
   {
-    value: "google/nano-banana/text-to-image",
-    label: "Nano Banana",
-  },
-  {
-    value: "wavespeed-ai/z-image/turbo",
+    value: Z_IMAGE_TURBO_MODEL,
     label: "Z Image Turbo",
   },
 ];

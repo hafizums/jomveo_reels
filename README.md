@@ -4,7 +4,7 @@ A small full-stack example that uses:
 
 - `React` for the prompt UI
 - `FastAPI` for the backend API
-- WaveSpeed's Nano Banana image API for styled art images
+- WaveSpeed's Z Image Turbo API for styled art images
 - WaveSpeed's OpenAI-compatible LLM API for short-video script generation
 - WaveSpeed's text-to-speech API for voiceover generation
 - WaveSpeed's music-generation API for background music
@@ -24,7 +24,7 @@ The React app has eight flows:
 - `POST /api/videos/generate` for assembling scene images, voiceover, music, and required burned-in captions into a finished MP4
 - `POST /api/scene-animations/generate` for animating every generated scene image from its start frame
 
-The FastAPI backend reads your `WAVESPEED_API_KEY`, generates styled art images through Google's Nano Banana text-to-image model, sends script requests to WaveSpeed's OpenAI-compatible chat completions endpoint with the model `openai/gpt-5.1`, generates voiceovers through ElevenLabs Multilingual V2 on WaveSpeed, creates original non-vocal background music through Mureka V9 Generate BGM, and renders captioned local videos through `pycaps`.
+The FastAPI backend reads your `WAVESPEED_API_KEY`, generates styled art images through Z Image Turbo, sends script requests to WaveSpeed's OpenAI-compatible chat completions endpoint with the model `openai/gpt-5.1`, generates voiceovers through Gemini 2.5 Flash TTS on WaveSpeed, creates original non-vocal background music through Mureka V9 Generate BGM, and renders captioned local videos through `pycaps`.
 
 The script flow supports `English` and `Malay` in the app UI.
 
@@ -128,9 +128,9 @@ Video jobs and their downloaded source assets are stored under `backend/generate
 
 WaveSpeed's current official docs use:
 
-- the text-to-image model `google/nano-banana/text-to-image`
+- the text-to-image model `wavespeed-ai/z-image/turbo`
 - the OpenAI-compatible LLM API under `https://llm.wavespeed.ai/v1/chat/completions`
-- the text-to-speech API through models such as `elevenlabs/multilingual-v2`
+- the text-to-speech model `google/gemini-2.5-flash/text-to-speech`
 - the music-generation API through models such as `mureka-ai/mureka-v9/generate-bgm`
 - the image-to-video model `wavespeed-ai/wan-2.2/i2v-480p-ultra-fast`
 - caption rendering through the open-source `pycaps` CLI at `https://github.com/francozanardi/pycaps`
@@ -139,19 +139,17 @@ This sample uses:
 
 - `openai/gpt-5.1` for script generation
 - `openai/gpt-5.4-mini` as an affordable script-generation option
-- `google/nano-banana/text-to-image` for the art-style module
-- `wavespeed-ai/z-image/turbo` as an optional fast art-style model
-- `elevenlabs/multilingual-v2` for voiceovers
-- `google/gemini-2.5-flash/text-to-speech` as an optional multilingual voiceover model
+- `wavespeed-ai/z-image/turbo` for the art-style module
+- `google/gemini-2.5-flash/text-to-speech` for multilingual voiceovers
 - `mureka-ai/mureka-v9/generate-bgm` for background music
 - `wavespeed-ai/wan-2.2/i2v-480p-ultra-fast` for optional 5- or 8-second animated scene clips
 - `pycaps` built-in templates such as `minimalist`, `word-focus`, `line-focus`, and `explosive` for caption styling
 
-The script generator keeps the prompt framework strict about truth mode and content niche. It targets a slow dramatic narration pace of roughly 84–99 spoken words for a 60-second clip, scaling the word range with the selected duration. The art-style generator combines a scene prompt with one of 10 predefined visual directions tuned to the story categories. It supports Nano Banana and Z Image Turbo, with a user-controlled safety-checker option powered by `wavespeed-ai/content-moderator/image`. Its scene-sequence flow uses `openai/gpt-5.4-mini` as a storyboard director: it reads the full script, decides how many visual beats the selected duration needs, and writes a standalone production prompt for each scene with continuity instructions. Z Image Turbo scene requests run sequentially to avoid burst-rate failures. The voiceover generator supports ElevenLabs tuning controls as well as Gemini 2.5 Flash TTS with a selectable language locale, named speaker, and one of its 30 documented voices. The background music generator uses Mureka's documented BGM flow with prompt-based non-vocal music generation and optional multiple variations. The caption module lets you upload a video from the browser, choose from multiple `pycaps` templates, and optionally provide an `srt`, `vtt`, `whisper_json`, or `pycaps_json` transcript. The Video Creator downloads the latest generated assets and uses FFmpeg plus required `pycaps` rendering to create the final video.
+The script generator keeps the prompt framework strict about truth mode and content niche. It targets a slow dramatic narration pace of roughly 84–99 spoken words for a 60-second clip, scaling the word range with the selected duration. The art-style generator combines a scene prompt with one of 10 predefined visual directions tuned to the story categories. It uses Z Image Turbo with a user-controlled safety-checker option powered by `wavespeed-ai/content-moderator/image`. Its scene-sequence flow uses `openai/gpt-5.4-mini` as a storyboard director: it reads the full script, decides how many visual beats the selected duration needs, and writes a standalone production prompt for each scene with continuity instructions. Z Image Turbo scene requests run sequentially to avoid burst-rate failures. The voiceover generator uses Gemini 2.5 Flash TTS with a selectable language locale, named speaker, and one of its 30 documented voices. The background music generator uses Mureka's documented BGM flow with prompt-based non-vocal music generation and optional multiple variations. The caption module lets you upload a video from the browser, choose from multiple `pycaps` templates, and optionally provide an `srt`, `vtt`, `whisper_json`, or `pycaps_json` transcript. The Video Creator downloads the latest generated assets and uses FFmpeg plus required `pycaps` rendering to create the final video.
 
 The storyboard planner also writes a constrained motion prompt for every image. Animate Scenes sends only that image through Wan's `image` start-frame field; it never sends `last_image`. Video Creator can then assemble either the still images or their corresponding animated clips.
 
-For script generation, the selected language is passed into the prompt so the model writes the output in that language. For voiceovers, the selected gender and style act as app-level selectors that map to valid ElevenLabs `voice_id` values from WaveSpeed's official voice list. For background music, the presets are designed for original non-vocal underscore tracks; review final usage rights and platform terms before commercial publishing. For caption rendering, the output video is written under `backend/generated/captions` and served back through `/generated/captions/...`.
+For script generation, the selected language is passed into the prompt so the model writes the output in that language. For voiceovers, the selected language, speaker name, and Gemini voice are sent to WaveSpeed's text-to-speech model. For background music, the presets are designed for original non-vocal underscore tracks; review final usage rights and platform terms before commercial publishing. For caption rendering, the output video is written under `backend/generated/captions` and served back through `/generated/captions/...`.
 
 If you still see `403 Forbidden`, that is usually account-side rather than code-side. Make sure your WaveSpeed key is active and your account is allowed to use the requested model or LLM endpoint.
 ## Backend quality checks

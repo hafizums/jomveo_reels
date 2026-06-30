@@ -67,7 +67,7 @@ test("queue button sends project and idempotency headers", async ({ page }) => {
   let headers;
   await page.unroute("**/api/**");
   await mockApi(page, { "POST /api/jobs/scripts/generate": (route, request) => { headers = request.headers(); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ job_id: "new_job" }) }); } });
-  await openGenerateWithProject(page); await page.getByRole("button", { name: "Queue script job" }).click();
+  await page.goto("/generate"); await page.getByRole("button", { name: "Queue script job" }).click();
   await expect.poll(() => headers?.["x-project-id"]).toBe(project.id);
   expect(headers["idempotency-key"]).toBeTruthy(); expect(headers["content-type"]).toContain("application/json");
 });
@@ -161,9 +161,11 @@ test("scene sequence uses slash route after synchronous script prerequisite", as
 
 test("missing project and prerequisites show friendly errors without wrong requests", async ({ page }) => {
   let queueCalls = 0; await page.unroute("**/api/**");
-  await mockApi(page, { "POST /api/jobs/scene-animations/generate": route => { queueCalls += 1; return route.abort(); }, "POST /api/jobs/videos/generate": route => { queueCalls += 1; return route.abort(); } });
+  await mockApi(page, { "GET /api/projects": route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ projects: [], count: 0 }) }), "POST /api/jobs/scene-animations/generate": route => { queueCalls += 1; return route.abort(); }, "POST /api/jobs/videos/generate": route => { queueCalls += 1; return route.abort(); } });
   await page.goto("/generate"); await page.getByRole("button", { name: "Queue script job" }).click();
   await expect(page.getByText("Please select or create a project before queueing a project job.")).toBeVisible();
+  await page.unroute("**/api/**");
+  await mockApi(page, { "POST /api/jobs/scene-animations/generate": route => { queueCalls += 1; return route.abort(); }, "POST /api/jobs/videos/generate": route => { queueCalls += 1; return route.abort(); } });
   await page.getByRole("link", { name: "Dashboard" }).click(); await expect(page.getByLabel("Project")).toHaveValue(project.id); await page.getByRole("link", { name: "Generate" }).click(); await page.getByRole("tab", { name: "Animate Scenes" }).click(); await page.getByRole("button", { name: "Queue animation job" }).click();
   await expect(page.getByText("Generate the required source content before queueing this project job.")).toBeVisible(); expect(queueCalls).toBe(0);
   await page.getByRole("tab", { name: "Caption Style" }).click(); await expect(page.getByText("Caption rendering currently runs synchronously.")).toBeVisible(); await expect(page.getByRole("button", { name: /Queue/ })).toHaveCount(0);
