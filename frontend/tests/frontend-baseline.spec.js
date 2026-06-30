@@ -195,3 +195,41 @@ test("unknown routes show the not found page", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "This page does not exist." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute("href", "/dashboard");
 });
+
+test("create series route and alias load the guided wizard", async ({ page }) => {
+  await page.goto("/create");
+  await expect(page.getByRole("heading", { name: "Create New Series" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose niche" })).toBeVisible();
+  await page.goto("/series/new");
+  await expect(page).toHaveURL(/\/create$/);
+  await expect(page.getByRole("button", { name: "Queue First Video" })).toBeVisible();
+});
+
+test("create series queues the first script job for the selected project", async ({ page }) => {
+  let queuedRequest;
+  await page.unroute("**/api/**");
+  await mockApi(page, {
+    "POST /api/jobs/scripts/generate": (route, request) => {
+      queuedRequest = request;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ job_id: "series_script_job", status: "queued" }) });
+    },
+  });
+  await page.goto("/create");
+  await expect(page.getByLabel("Project")).toHaveValue(project.id);
+  await page.getByRole("button", { name: /Heists/ }).click();
+  await page.getByLabel("Series name").fill("Great Heists");
+  await page.getByLabel("Topic").fill("A documented museum robbery");
+  await page.getByRole("button", { name: "Queue First Video" }).click();
+  await expect(page.getByText("Queued first video script job series_script_job.")).toBeVisible();
+  expect(new URL(queuedRequest.url()).pathname).toBe("/api/jobs/scripts/generate");
+  expect(queuedRequest.headers()["x-project-id"]).toBe(project.id);
+  expect(queuedRequest.headers()["idempotency-key"]).toBeTruthy();
+  expect((await queuedRequest.postDataJSON()).topic_hint).toBe("A documented museum robbery");
+});
+
+test("mobile create series page avoids horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/create");
+  await expect(page.getByRole("heading", { name: "Create New Series" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});

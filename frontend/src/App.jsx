@@ -14,6 +14,7 @@ import { resolveQueueConfiguration } from "./lib/jobPayloads";
 import AppShell from "./routes/AppShell";
 import AssetsPage from "./routes/AssetsPage";
 import BillingPage from "./routes/BillingPage";
+import CreateSeriesPage from "./routes/CreateSeriesPage";
 import DashboardPage from "./routes/DashboardPage";
 import GeneratePage from "./routes/GeneratePage";
 import JobDetailPage from "./routes/JobDetailPage";
@@ -881,6 +882,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/workspace" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/series/new" element={<Navigate to="/create" replace />} />
+        <Route path="/create" element={<CreateSeriesPage projectId={selectedProjectId} onProjectChange={selectProject} />} />
         <Route path="/dashboard" element={<DashboardPage projectId={selectedProjectId} onProjectChange={selectProject} refreshToken={dashboardRefresh} />} />
         <Route path="/generate" element={<GeneratePage>{generatorWorkspace}</GeneratePage>} />
         <Route path="/projects/:projectId" element={<ProjectPage onProjectChange={selectProject} refreshToken={dashboardRefresh} />} />

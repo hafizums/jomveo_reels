@@ -8,6 +8,7 @@ describe("workspace routing", () => {
   test("app shell links selected-project workspace pages", () => {
     render(<MemoryRouter initialEntries={["/dashboard"]}><AppShell selectedProjectId="project_demo"><p>Content</p></AppShell></MemoryRouter>);
     expect(screen.getByRole("navigation", { name: "Workspace navigation" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Create" })).toHaveAttribute("href", "/create");
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: "Generate" })).toHaveAttribute("href", "/generate");
     expect(screen.getByRole("link", { name: "Jobs" })).toHaveAttribute("href", "/projects/project_demo/jobs");
