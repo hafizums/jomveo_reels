@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api"
     admin_auth_enabled: bool = True
     admin_api_keys: list[str] = Field(default_factory=list)
+    user_auth_enabled: bool = False
+    demo_user_enabled: bool = True
+    demo_user_email: str = "demo@jomveo.local"
     wavespeed_api_key: str = ""
     wavespeed_llm_base_url: str = "https://llm.wavespeed.ai/v1"
     wavespeed_api_base_url: str = "https://api.wavespeed.ai/api/v3"

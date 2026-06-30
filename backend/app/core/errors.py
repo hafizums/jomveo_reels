@@ -21,6 +21,11 @@ class AuthForbiddenError(AppError):
     code = "auth_forbidden"
 
 
+class ProjectNotFoundError(AppError):
+    status_code = 404
+    code = "project_not_found"
+
+
 class ProviderError(AppError):
     status_code = 502
     code = "provider_error"

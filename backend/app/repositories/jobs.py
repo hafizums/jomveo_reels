@@ -5,7 +5,7 @@ from sqlalchemy import Select, and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from backend.app.core.errors import JobNotFoundError
-from backend.app.db.models import GenerationJob, utc_now
+from backend.app.db.models import GenerationJob, ProjectMember, utc_now
 
 
 class JobRepository:
@@ -18,6 +18,8 @@ class JobRepository:
         input_json: dict[str, Any],
         max_attempts: int,
         idempotency_key: str | None = None,
+        project_id: str | None = None,
+        created_by_user_id: str | None = None,
     ) -> GenerationJob:
         job = GenerationJob(
             type=job_type,
@@ -25,6 +27,8 @@ class JobRepository:
             input_json=input_json,
             max_attempts=max_attempts,
             idempotency_key=idempotency_key,
+            project_id=project_id,
+            created_by_user_id=created_by_user_id,
         )
         self.session.add(job)
         self.session.flush()
@@ -53,6 +57,33 @@ class JobRepository:
     def list_recent(self, limit: int) -> list[GenerationJob]:
         statement: Select[tuple[GenerationJob]] = (
             select(GenerationJob).order_by(GenerationJob.created_at.desc()).limit(limit)
+        )
+        return list(self.session.scalars(statement))
+
+    def list_for_project(self, project_id: str, limit: int = 100) -> list[GenerationJob]:
+        statement = (
+            select(GenerationJob)
+            .where(GenerationJob.project_id == project_id)
+            .order_by(GenerationJob.created_at.desc())
+            .limit(limit)
+        )
+        return list(self.session.scalars(statement))
+
+    def list_for_user(
+        self, user_id: str, limit: int, include_unowned: bool = False
+    ) -> list[GenerationJob]:
+        project_ids = select(ProjectMember.project_id).where(ProjectMember.user_id == user_id)
+        ownership = or_(
+            GenerationJob.created_by_user_id == user_id,
+            GenerationJob.project_id.in_(project_ids),
+        )
+        if include_unowned:
+            ownership = or_(ownership, GenerationJob.created_by_user_id.is_(None))
+        statement = (
+            select(GenerationJob)
+            .where(ownership)
+            .order_by(GenerationJob.created_at.desc())
+            .limit(limit)
         )
         return list(self.session.scalars(statement))
 

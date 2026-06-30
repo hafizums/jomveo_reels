@@ -258,6 +258,9 @@ in `backend/.env`; never commit real keys:
 ```env
 ADMIN_AUTH_ENABLED=true
 ADMIN_API_KEYS='["replace-with-a-random-admin-key"]'
+USER_AUTH_ENABLED=false
+DEMO_USER_ENABLED=true
+DEMO_USER_EMAIL=demo@jomveo.local
 ```
 
 Send the key using the preferred bearer header:
@@ -281,7 +284,49 @@ For isolated local development, authentication can be disabled with
 fails when admin authentication is enabled without at least one configured key.
 
 This API-key mechanism is an admin foundation, not end-user identity. A future milestone
-should replace it with user/project authentication and role-based authorization.
+can replace API keys with browser sessions or JWT-based login.
+
+## Users, projects, and job ownership
+
+The backend now has persistent users, hashed API-key records, projects, memberships,
+owned jobs, and audit history. Raw user API keys are never stored: only a SHA-256 hash
+and a short display prefix are retained. User keys can be supplied through either
+`Authorization: Bearer <user-api-key>` or `X-User-API-Key: <user-api-key>`. Configured
+admin keys continue to work and have system-wide access.
+
+Until the frontend has login support, `DEMO_USER_ENABLED=true` resolves unauthenticated
+job requests to `demo@jomveo.local` and its Demo Project. This preserves the existing
+generation flow and response shapes. Demo mode is unsafe for a public multi-user
+production deployment because unauthenticated visitors share one identity and project;
+disable it when user authentication is deployed.
+
+Project routes are available under `/api/projects`, including CRUD, membership
+management, and `GET /api/projects/{project_id}/jobs`. Existing job creation routes may
+select a project with `X-Project-ID`. Without that header, demo requests are attached to
+the Demo Project. Job list/detail responses are scoped to the authenticated user's own
+jobs and accessible projects; system admins can inspect all jobs.
+
+Project permissions are:
+
+- `owner`: read, update, delete, manage members, create jobs, and read jobs.
+- `admin`: read, update, manage non-owner membership, create jobs, and read jobs.
+- `editor`: read the project and create/read jobs.
+- `viewer`: read the project and its jobs.
+
+Project creation automatically makes the creating user an owner. API keys can currently
+be seeded by backend tests or trusted development code using `UserRepository.create()`
+and `APIKeyRepository.create(raw_key, name, role, user_id)`; the raw key is supplied and
+managed by that caller and is not recoverable from the database.
+
+Persistent audit entries record project and membership changes, job creation and admin
+job actions, provider live-status checks, and API-key acceptance/rejection. Audit
+metadata is allow-listed and excludes raw keys, full prompts, scripts, provider payloads,
+and provider responses. System admins can inspect recent entries with `GET /api/audit`
+and optionally filter by `project_id`.
+
+Production rejects disabled admin authentication and the documented change-me admin
+key. Future work should add frontend login, session/JWT authentication, project
+dashboards, per-project billing, and per-project object storage.
 
 ## WaveSpeed provider integration
 

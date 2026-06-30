@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.api.v1.router import router as api_router
 from backend.app.application.jobs.queue import create_job_queue
 from backend.app.application.jobs.service import JobService
+from backend.app.application.projects.service import ProjectService
 from backend.app.auth.security import validate_admin_configuration
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import ConfigurationError
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.db_engine = engine
     application.state.session_factory = session_factory
     application.state.job_service = JobService(session_factory, queue, settings)
+    application.state.project_service = ProjectService(session_factory)
     application.dependency_overrides[get_settings] = lambda: settings
 
     application.add_middleware(

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, Request
 
 from backend.app.auth.dependencies import require_admin
 from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
+from backend.app.repositories.audit_logs import AuditLogRepository
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,6 +45,11 @@ def wavespeed_status(request: Request, live: bool = Query(default=False)) -> dic
             "principal_subject": principal.subject,
         },
     )
+    with request.app.state.session_factory() as session:
+        AuditLogRepository(session).record(
+            principal, "provider_live_status", "provider", "wavespeed"
+        )
+        session.commit()
     if not settings.allow_provider_live_checks:
         response["live_check_status"] = "disabled"
         return response
