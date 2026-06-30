@@ -206,8 +206,8 @@ JOB_WORKER_ID=local-worker
 
 Retryable provider, timeout, bad-response, and unexpected worker errors move a
 job to `retrying` until its attempt limit is reached. The recovery endpoint
-requeues due retries and recovers stale running jobs. Authentication must be
-added to this administrative endpoint before a public production deployment.
+requeues due retries and recovers stale running jobs. Recovery and cancellation
+are administrative operations protected by the API-key authentication described below.
 
 Inline mode executes the initial attempt in the API process. Retries deliberately
 wait for `POST /api/jobs/recover-stale` to avoid recursive inline execution. RQ
@@ -247,8 +247,41 @@ ALLOWED_REMOTE_ASSET_SCHEMES='["https","http"]'
 
 `POST /api/caption-style/generate` remains synchronous. Its uploads are now safely
 persisted, but the optional caption job route is deferred until job-specific retention
-and cleanup policies are available. Recovery and cancellation endpoints remain
-unauthenticated development tools and must be protected before public deployment.
+and cleanup policies are available.
+
+## Administrative authentication
+
+Administrative API-key authentication protects internal controls while public/demo
+generation and job creation/status routes remain unchanged. Configure one or more keys
+in `backend/.env`; never commit real keys:
+
+```env
+ADMIN_AUTH_ENABLED=true
+ADMIN_API_KEYS='["replace-with-a-random-admin-key"]'
+```
+
+Send the key using the preferred bearer header:
+
+```text
+Authorization: Bearer <admin-api-key>
+```
+
+Local tooling may instead use `X-Admin-API-Key: <admin-api-key>`. The protected routes
+are:
+
+- `POST /api/jobs/recover-stale`
+- `POST /api/jobs/{job_id}/cancel`
+- `GET /api/provider/wavespeed/status?live=true`
+
+Public `GET /api/provider/wavespeed/status` diagnostics do not require authentication.
+The live form still obeys `ALLOW_PROVIDER_LIVE_CHECKS` and never runs model inference.
+
+For isolated local development, authentication can be disabled with
+`ADMIN_AUTH_ENABLED=false`. Never use that setting in production. Production startup
+fails when admin authentication is enabled without at least one configured key.
+
+This API-key mechanism is an admin foundation, not end-user identity. A future milestone
+should replace it with user/project authentication and role-based authorization.
 
 ## WaveSpeed provider integration
 

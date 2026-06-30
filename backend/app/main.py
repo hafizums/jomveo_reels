@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.api.v1.router import router as api_router
 from backend.app.application.jobs.queue import create_job_queue
 from backend.app.application.jobs.service import JobService
+from backend.app.auth.security import validate_admin_configuration
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import ConfigurationError
 from backend.app.core.exception_handlers import register_exception_handlers
@@ -20,6 +21,7 @@ from backend.app.workers.runner import execute_job
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    validate_admin_configuration(settings)
 
     settings.generated_root.mkdir(parents=True, exist_ok=True)
     if settings.storage_backend != "local":

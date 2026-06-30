@@ -11,6 +11,16 @@ class ConfigurationError(AppError):
     code = "configuration_error"
 
 
+class AuthRequiredError(AppError):
+    status_code = 401
+    code = "auth_required"
+
+
+class AuthForbiddenError(AppError):
+    status_code = 403
+    code = "auth_forbidden"
+
+
 class ProviderError(AppError):
     status_code = 502
     code = "provider_error"

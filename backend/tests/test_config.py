@@ -8,6 +8,8 @@ def test_settings_have_local_development_defaults() -> None:
 
     assert settings.app_name == "JomVeo Reels API"
     assert settings.api_v1_prefix == "/api"
+    assert settings.admin_auth_enabled is True
+    assert settings.admin_api_keys == []
     assert isinstance(settings.generated_root, Path)
     assert "http://localhost:5173" in settings.cors_allowed_origins
     assert settings.database_url == "sqlite:///backend/generated/jomveo.db"
@@ -38,8 +40,12 @@ def test_settings_have_local_development_defaults() -> None:
 def test_settings_load_environment_variables(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("ADMIN_AUTH_ENABLED", "true")
+    monkeypatch.setenv("ADMIN_API_KEYS", '["first-admin-key", " second-admin-key "]')
 
     settings = Settings(_env_file=None)
 
     assert settings.app_env == "test"
     assert settings.log_level == "DEBUG"
+    assert settings.admin_auth_enabled is True
+    assert settings.admin_api_keys == ["first-admin-key", "second-admin-key"]

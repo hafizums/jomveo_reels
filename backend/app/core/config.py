@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = False
     api_v1_prefix: str = "/api"
+    admin_auth_enabled: bool = True
+    admin_api_keys: list[str] = Field(default_factory=list)
     wavespeed_api_key: str = ""
     wavespeed_llm_base_url: str = "https://llm.wavespeed.ai/v1"
     wavespeed_api_base_url: str = "https://api.wavespeed.ai/api/v3"
@@ -74,6 +76,11 @@ class Settings(BaseSettings):
     @classmethod
     def resolve_generated_root(cls, value: Path) -> Path:
         return value if value.is_absolute() else BACKEND_ROOT / value
+
+    @field_validator("admin_api_keys")
+    @classmethod
+    def normalize_admin_api_keys(cls, value: list[str]) -> list[str]:
+        return [key.strip() for key in value if key.strip()]
 
 
 @lru_cache

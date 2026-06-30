@@ -1,11 +1,14 @@
+import logging
 from importlib import metadata, util
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
 
+from backend.app.auth.dependencies import require_admin
 from backend.app.infrastructure.providers.wavespeed import create_wavespeed_provider_client
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _sdk_version() -> str | None:
@@ -33,6 +36,14 @@ def wavespeed_status(request: Request, live: bool = Query(default=False)) -> dic
     }
     if not live:
         return response
+    principal = require_admin(request)
+    logger.info(
+        "admin_action",
+        extra={
+            "admin_action": "provider_live_status",
+            "principal_subject": principal.subject,
+        },
+    )
     if not settings.allow_provider_live_checks:
         response["live_check_status"] = "disabled"
         return response
