@@ -109,12 +109,25 @@ test("persistent controls use exact routes, project, and idempotency headers", a
   handlers[`GET /api/projects/${project.id}/jobs`] = route => { jobRefreshes += 1; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: [job], count: 1 }) }); };
   for (const path of ["scripts", "voiceovers", "background-music", "art-style"]) handlers[`POST /api/jobs/${path}/generate`] = (route, request) => { requests.push({ path: new URL(request.url()).pathname, headers: request.headers() }); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ job_id: `queued_${path}`, status: "queued" }) }); };
   await mockApi(page, handlers); await page.goto("/");
-  for (const [tab, button] of [["60-Second Scripts", "Queue script job"], ["Voiceover", "Queue voiceover job"], ["Background Music", "Queue music job"], ["Art Style", "Queue art job"]]) { await page.getByRole("tab", { name: tab }).click(); await page.getByRole("button", { name: button }).click(); }
+  for (const [tab, button] of [["60-Second Scripts", "Queue script job"], ["Voiceover", "Queue voiceover job"], ["Background Music", "Queue music job"], ["Art Style", "Queue art job"]]) {
+    await page.getByRole("tab", { name: tab }).click();
+    if (tab === "Voiceover") await page.getByLabel("Voiceover Text").fill("Narration for the persistent voiceover job.");
+    await page.getByRole("button", { name: button }).click();
+  }
   await expect.poll(() => requests.length).toBe(4);
   await expect(page.getByText(/Queued project job queued_art-style/)).toBeVisible();
   expect(jobRefreshes).toBeGreaterThanOrEqual(5);
   expect(requests.map(item => item.path)).toEqual(["/api/jobs/scripts/generate", "/api/jobs/voiceovers/generate", "/api/jobs/background-music/generate", "/api/jobs/art-style/generate"]);
   for (const request of requests) { expect(request.headers["x-project-id"]).toBe(project.id); expect(request.headers["idempotency-key"]).toBeTruthy(); }
+});
+
+test("empty voiceover text blocks persistent request with a friendly message", async ({ page }) => {
+  let voiceoverRequests = 0;
+  await page.unroute("**/api/**");
+  await mockApi(page, { "POST /api/jobs/voiceovers/generate": route => { voiceoverRequests += 1; return route.abort(); } });
+  await page.goto("/"); await page.getByRole("tab", { name: "Voiceover" }).click(); await page.getByRole("button", { name: "Queue voiceover job" }).click();
+  await expect(page.getByText("Enter voiceover text before queueing this project job.")).toBeVisible();
+  expect(voiceoverRequests).toBe(0);
 });
 
 test("scene sequence uses slash route after synchronous script prerequisite", async ({ page }) => {

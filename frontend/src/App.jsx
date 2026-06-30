@@ -673,7 +673,10 @@ export default function App() {
 
   const queueConfiguration = (requestedKind) => {
     if (activeTab === "scripts") return ["scripts", scriptForm, "script"];
-    if (activeTab === "voiceover") return ["voiceovers", voiceForm, "voiceover"];
+    if (activeTab === "voiceover") {
+      if (!voiceForm.text.trim()) return null;
+      return ["voiceovers", voiceForm, "voiceover"];
+    }
     if (activeTab === "music") return ["background-music", musicForm, "music"];
     if (activeTab === "art") {
       if (requestedKind === "art-style/scenes") return scriptResult?.script ? ["art-style/scenes", { script: scriptResult.script, title: scriptResult.title, event_name: scriptResult.event_name, duration_seconds: scriptResult.duration_seconds, planner_model: "openai/gpt-5.4-mini", style_name: artForm.style_name, art_direction: artForm.art_direction, model: artForm.model, enable_safety_checker: artForm.enable_safety_checker }, "scene sequence"] : null;
@@ -688,7 +691,13 @@ export default function App() {
     setQueueError(""); setQueueMessage("");
     if (!selectedProjectId) return setQueueError("Please select or create a project before queueing a project job.");
     const configuration = queueConfiguration(requestedKind);
-    if (!configuration) return setQueueError("Generate the required source content before queueing this project job.");
+    if (!configuration) {
+      return setQueueError(
+        activeTab === "voiceover"
+          ? "Enter voiceover text before queueing this project job."
+          : "Generate the required source content before queueing this project job.",
+      );
+    }
     try {
       const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, selectedProjectId);
       setQueueMessage(`Queued project job ${accepted.job_id}.`); setDashboardRefresh(value => value + 1);
