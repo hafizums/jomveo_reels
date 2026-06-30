@@ -100,3 +100,40 @@ test("synchronous art generation still renders image output", async ({ page }) =
   await page.goto("/"); await page.getByRole("tab", { name: "Art Style" }).click(); await page.getByRole("button", { name: "Generate art-style image" }).click();
   await expect(page.getByRole("heading", { name: "Art Result" })).toBeVisible(); await expect(page.getByRole("img")).toHaveAttribute("src", "https://provider.example/image.png");
 });
+
+test("persistent controls use exact routes, project, and idempotency headers", async ({ page }) => {
+  const requests = [];
+  let jobRefreshes = 0;
+  await page.unroute("**/api/**");
+  const handlers = {};
+  handlers[`GET /api/projects/${project.id}/jobs`] = route => { jobRefreshes += 1; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobs: [job], count: 1 }) }); };
+  for (const path of ["scripts", "voiceovers", "background-music", "art-style"]) handlers[`POST /api/jobs/${path}/generate`] = (route, request) => { requests.push({ path: new URL(request.url()).pathname, headers: request.headers() }); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ job_id: `queued_${path}`, status: "queued" }) }); };
+  await mockApi(page, handlers); await page.goto("/");
+  for (const [tab, button] of [["60-Second Scripts", "Queue script job"], ["Voiceover", "Queue voiceover job"], ["Background Music", "Queue music job"], ["Art Style", "Queue art job"]]) { await page.getByRole("tab", { name: tab }).click(); await page.getByRole("button", { name: button }).click(); }
+  await expect.poll(() => requests.length).toBe(4);
+  await expect(page.getByText(/Queued project job queued_art-style/)).toBeVisible();
+  expect(jobRefreshes).toBeGreaterThanOrEqual(5);
+  expect(requests.map(item => item.path)).toEqual(["/api/jobs/scripts/generate", "/api/jobs/voiceovers/generate", "/api/jobs/background-music/generate", "/api/jobs/art-style/generate"]);
+  for (const request of requests) { expect(request.headers["x-project-id"]).toBe(project.id); expect(request.headers["idempotency-key"]).toBeTruthy(); }
+});
+
+test("scene sequence uses slash route after synchronous script prerequisite", async ({ page }) => {
+  let queued;
+  await page.unroute("**/api/**");
+  await mockApi(page, {
+    "POST /api/scripts/generate": route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ title: "Story", event_name: "Event", script: "A sufficiently long fixture script for scenes.", factual_basis: "Fixture", duration_seconds: 60, language: "English" }) }),
+    "POST /api/jobs/art-style/scenes/generate": (route, request) => { queued = request; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ job_id: "scene_job", status: "queued" }) }); },
+  });
+  await page.goto("/"); await page.getByRole("button", { name: "Generate script" }).click(); await page.getByRole("tab", { name: "Art Style" }).click(); await page.getByRole("button", { name: "Queue scene sequence job" }).click();
+  await expect.poll(() => queued && new URL(queued.url()).pathname).toBe("/api/jobs/art-style/scenes/generate");
+});
+
+test("missing project and prerequisites show friendly errors without wrong requests", async ({ page }) => {
+  let queueCalls = 0; await page.unroute("**/api/**");
+  await mockApi(page, { "POST /api/jobs/scene-animations/generate": route => { queueCalls += 1; return route.abort(); }, "POST /api/jobs/videos/generate": route => { queueCalls += 1; return route.abort(); } });
+  await page.goto("/"); await page.getByLabel("Project").selectOption(""); await page.getByRole("button", { name: "Queue script job" }).click();
+  await expect(page.getByText("Please select or create a project before queueing a project job.")).toBeVisible();
+  await page.getByLabel("Project").selectOption(project.id); await page.getByRole("tab", { name: "Animate Scenes" }).click(); await page.getByRole("button", { name: "Queue animation job" }).click();
+  await expect(page.getByText("Generate the required source content before queueing this project job.")).toBeVisible(); expect(queueCalls).toBe(0);
+  await page.getByRole("tab", { name: "Caption Style" }).click(); await expect(page.getByText("Caption rendering currently runs synchronously.")).toBeVisible(); await expect(page.getByRole("button", { name: /Queue/ })).toHaveCount(0);
+});
