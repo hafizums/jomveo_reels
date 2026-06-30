@@ -455,6 +455,9 @@ forms remain available in the routed generator studio.
 
 The frontend workspace uses lightweight client-side routes. Open `/dashboard` for the
 project overview and `/generate` for all synchronous and persistent generator controls.
+Open `/create` for the guided Create New Series workflow; `/series/new` redirects there.
+The MVP stores series drafts in the browser and queues the configured first script job,
+then directs advanced production work to `/generate`.
 Selected-project jobs, assets, and billing are available under `/projects/{project_id}`,
 and individual jobs open at `/jobs/{job_id}`. The top navigation keeps these pages
 connected while preserving `jomveo.selectedProjectId` across reloads.

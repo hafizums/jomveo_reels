@@ -15,6 +15,7 @@ export default function AppShell({ selectedProjectId, children }) {
       <header className="app-topbar">
         <NavLink className="app-brand" to="/dashboard">Jomveo</NavLink>
         <nav className="app-nav" aria-label="Workspace navigation">
+          <NavLink className={navClass} to="/create">Create</NavLink>
           <NavLink className={navClass} to="/dashboard">Dashboard</NavLink>
           <NavLink className={navClass} to="/generate">Generate</NavLink>
           <NavLink className={projectNavClass("jobs")} to={`${projectBase}${selectedProjectId ? "/jobs" : ""}`}>Jobs</NavLink>
