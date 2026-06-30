@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from backend.app.application.billing.service import BillingService
 from backend.app.application.jobs.registry import get_job_definition
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import AppError
@@ -56,6 +57,7 @@ def _record_failure(
                 job_repository.mark_retrying(job, code, message, next_retry_at)
             else:
                 job_repository.mark_failed(job, code, message)
+                BillingService(session, settings).release(job)
         if provider_run_id:
             provider_run_repository = ProviderRunRepository(session)
             provider_run = provider_run_repository.get(provider_run_id)
@@ -150,6 +152,7 @@ def execute_job(
                 if isinstance(scene_count, int) and scene_count > 0:
                     job_repository.set_progress_total(job, scene_count + 1)
             job_repository.mark_completed(job, result)
+            BillingService(session, settings).consume(job, provider_run)
             if provider_run is not None:
                 provider_run_repository.mark_completed(
                     provider_run,

@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     user_auth_enabled: bool = False
     demo_user_enabled: bool = True
     demo_user_email: str = "demo@jomveo.local"
+    billing_enabled: bool = True
+    demo_billing_enabled: bool = False
+    default_project_starting_credits: int = 0
+    default_daily_job_limit: int | None = 100
+    default_monthly_job_limit: int | None = 1000
+    default_daily_credit_limit: int | None = None
+    default_monthly_credit_limit: int | None = None
+    default_max_concurrent_jobs: int | None = 3
+    pricing_version: str = "2026-06-30"
     wavespeed_api_key: str = ""
     wavespeed_llm_base_url: str = "https://llm.wavespeed.ai/v1"
     wavespeed_api_base_url: str = "https://api.wavespeed.ai/api/v3"

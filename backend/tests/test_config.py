@@ -13,6 +13,13 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.user_auth_enabled is False
     assert settings.demo_user_enabled is True
     assert settings.demo_user_email == "demo@jomveo.local"
+    assert settings.billing_enabled is True
+    assert settings.demo_billing_enabled is False
+    assert settings.default_project_starting_credits == 0
+    assert settings.default_daily_job_limit == 100
+    assert settings.default_monthly_job_limit == 1000
+    assert settings.default_max_concurrent_jobs == 3
+    assert settings.pricing_version == "2026-06-30"
     assert isinstance(settings.generated_root, Path)
     assert "http://localhost:5173" in settings.cors_allowed_origins
     assert settings.database_url == "sqlite:///backend/generated/jomveo.db"

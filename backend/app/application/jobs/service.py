@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from backend.app.application.billing.pricing import estimate_job_cost
+from backend.app.application.billing.service import BillingService
 from backend.app.application.jobs.queue import JobQueue
 from backend.app.application.jobs.recovery import recover_stale_jobs, requeue_due_jobs
 from backend.app.application.jobs.schemas import (
@@ -14,7 +16,12 @@ from backend.app.application.jobs.schemas import (
 from backend.app.application.projects.permissions import require_project_role
 from backend.app.auth.models import AuthenticatedPrincipal
 from backend.app.core.config import Settings
-from backend.app.core.errors import AuthForbiddenError, ValidationAppError
+from backend.app.core.errors import (
+    AuthForbiddenError,
+    BillingInsufficientCreditsError,
+    QuotaExceededError,
+    ValidationAppError,
+)
 from backend.app.db.models import GenerationJob
 from backend.app.db.session import SessionFactory
 from backend.app.repositories.audit_logs import AuditLogRepository
@@ -105,15 +112,44 @@ class JobService:
                 if existing:
                     self._require_job_access(session, existing, principal)
                     return job_to_accepted(existing, self.settings.api_v1_prefix)
+            input_json = payload.model_dump(mode="json")
+            estimate = estimate_job_cost(job_type, input_json, self.settings)
+            billing = BillingService(session, self.settings)
+            if resolved_project_id is not None:
+                try:
+                    billing.check_quotas(resolved_project_id, estimate.estimated_credits)
+                except QuotaExceededError:
+                    session.rollback()
+                    self._audit_billing_rejection(
+                        principal,
+                        resolved_project_id,
+                        "job_quota_rejected",
+                        estimate.estimated_credits,
+                    )
+                    raise
             try:
                 job = repository.create(
                     job_type,
-                    payload.model_dump(mode="json"),
+                    input_json,
                     self.settings.job_max_attempts,
                     normalized_key,
                     resolved_project_id,
                     principal.user_id,
                 )
+                billing_required = (
+                    self.settings.billing_enabled
+                    and resolved_project_id is not None
+                    and not (
+                        principal.email == self.settings.demo_user_email.casefold()
+                        and not self.settings.demo_billing_enabled
+                    )
+                )
+                if billing_required:
+                    billing.reserve(job, estimate, principal)
+                else:
+                    job.estimated_credits = estimate.estimated_credits
+                    job.reserved_credits = 0
+                    job.billing_status = "not_required"
                 AuditLogRepository(session).record(
                     principal,
                     "job_created",
@@ -123,6 +159,15 @@ class JobService:
                     {"job_type": job_type},
                 )
                 session.commit()
+            except BillingInsufficientCreditsError:
+                session.rollback()
+                self._audit_billing_rejection(
+                    principal,
+                    resolved_project_id,
+                    "job_credit_rejected",
+                    estimate.estimated_credits,
+                )
+                raise
             except IntegrityError:
                 session.rollback()
                 if not normalized_key:
@@ -170,6 +215,7 @@ class JobService:
             provider_run_repository = ProviderRunRepository(session)
             for provider_run in provider_run_repository.list_running_for_job(job.id):
                 provider_run_repository.mark_cancelled(provider_run)
+            BillingService(session, self.settings).release(job)
             AuditLogRepository(session).record(
                 principal, "job_cancelled", "generation_job", job.id, job.project_id
             )
@@ -212,3 +258,20 @@ class JobService:
         ):
             return
         raise AuthForbiddenError("You do not have permission to access this job.")
+
+    def _audit_billing_rejection(
+        self,
+        principal: AuthenticatedPrincipal,
+        project_id: str | None,
+        action: str,
+        estimated_credits: int,
+    ) -> None:
+        with self.session_factory() as audit_session:
+            AuditLogRepository(audit_session).record(
+                principal,
+                action,
+                "generation_job",
+                project_id=project_id,
+                metadata={"estimated_credits": estimated_credits},
+            )
+            audit_session.commit()

@@ -47,7 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.db_engine = engine
     application.state.session_factory = session_factory
     application.state.job_service = JobService(session_factory, queue, settings)
-    application.state.project_service = ProjectService(session_factory)
+    application.state.project_service = ProjectService(session_factory, settings)
     application.dependency_overrides[get_settings] = lambda: settings
 
     application.add_middleware(

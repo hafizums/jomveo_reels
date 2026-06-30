@@ -6,7 +6,18 @@ from sqlalchemy.orm import Session
 from backend.app.auth.models import AuthenticatedPrincipal
 from backend.app.db.models import AuditLog
 
-SAFE_METADATA_KEYS = {"job_type", "member_user_id", "member_role", "status", "count"}
+SAFE_METADATA_KEYS = {
+    "job_type",
+    "member_user_id",
+    "member_role",
+    "status",
+    "count",
+    "amount_credits",
+    "estimated_credits",
+    "reserved_credits",
+    "billing_status",
+    "quota_key",
+}
 
 
 class AuditLogRepository:

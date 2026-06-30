@@ -328,6 +328,41 @@ Production rejects disabled admin authentication and the documented change-me ad
 key. Future work should add frontend login, session/JWT authentication, project
 dashboards, per-project billing, and per-project object storage.
 
+## Project billing and quotas
+
+Project jobs use an integer credit ledger; **1 credit represents 1 US cent** and 100
+credits represent USD 1.00. These credits currently use conservative internal placeholder
+estimates, not authoritative WaveSpeed prices. Real provider price synchronization and
+post-run reconciliation remain future work.
+
+When billing is required, job creation estimates its cost, checks daily/monthly job and
+credit quotas plus concurrent-job limits, and reserves credits atomically with the job.
+A successful job consumes its reservation. Exhausted failures and cancellations release
+it, while retries retain the original reservation. Idempotent job reuse never reserves a
+second time. Provider cost records retain the estimate and current placeholder actual
+cost for later reconciliation.
+
+Demo requests bypass credit requirements by default when
+`DEMO_BILLING_ENABLED=false`, preserving the existing frontend workflow. Set it to true
+to test billing against the Demo Project. `BILLING_ENABLED=false` disables reservations
+globally while retaining ownership behavior.
+
+Billing routes are:
+
+- `GET /api/projects/{project_id}/billing`
+- `GET /api/projects/{project_id}/billing/transactions`
+- `GET /api/projects/{project_id}/billing/usage`
+- `GET /api/projects/{project_id}/quotas`
+- `POST /api/projects/{project_id}/billing/top-up` (system admin)
+- `POST /api/projects/{project_id}/billing/reconcile` (system admin)
+- `PATCH /api/projects/{project_id}/quotas` (system admin)
+
+Top-ups increase balance and lifetime purchased credits. Every reserve, consume, release,
+and top-up is appended to the transaction ledger, and billing/quota actions are also
+written to the safe audit log. Future billing milestones should add real provider price
+sync, payment gateways such as Stripe/Billplz/ToyyibPay, invoices, and a project billing
+dashboard.
+
 ## WaveSpeed provider integration
 
 Model inference uses the official
