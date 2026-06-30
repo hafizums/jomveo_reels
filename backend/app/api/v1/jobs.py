@@ -1,6 +1,7 @@
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 
 from backend.app.application.jobs.schemas import (
     JobAcceptedResponse,
@@ -11,6 +12,8 @@ from backend.app.application.jobs.schemas import (
 )
 from backend.app.application.jobs.service import JobService
 from backend.app.art_style_generator import ArtStyleRequest
+from backend.app.auth.dependencies import require_admin
+from backend.app.auth.models import AuthenticatedPrincipal
 from backend.app.background_music_generator import BackgroundMusicRequest
 from backend.app.scene_animation_generator import SceneAnimationRequest
 from backend.app.scene_generator import SceneSequenceRequest
@@ -19,7 +22,9 @@ from backend.app.video_generator import VideoGenerationRequest
 from backend.app.voiceover_generator import VoiceoverRequest
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key")]
+AdminPrincipal = Annotated[AuthenticatedPrincipal, Depends(require_admin)]
 
 
 def get_job_service(request: Request) -> JobService:
@@ -91,9 +96,15 @@ def create_video_job(
     return get_job_service(request).create_job("video.generate", payload, idempotency_key)
 
 
-# TODO: Protect this endpoint before public production deployment once auth exists.
 @router.post("/recover-stale", response_model=JobRecoveryResponse)
-def recover_stale(request: Request) -> JobRecoveryResponse:
+def recover_stale(request: Request, principal: AdminPrincipal) -> JobRecoveryResponse:
+    logger.info(
+        "admin_action",
+        extra={
+            "admin_action": "job_recover_stale",
+            "principal_subject": principal.subject,
+        },
+    )
     return get_job_service(request).recover_jobs()
 
 
@@ -106,7 +117,19 @@ def list_jobs(
 
 
 @router.post("/{job_id}/cancel", response_model=JobCancellationResponse)
-def cancel_job(job_id: str, request: Request) -> JobCancellationResponse:
+def cancel_job(
+    job_id: str,
+    request: Request,
+    principal: AdminPrincipal,
+) -> JobCancellationResponse:
+    logger.info(
+        "admin_action",
+        extra={
+            "admin_action": "job_cancel",
+            "principal_subject": principal.subject,
+            "target_job_id": job_id,
+        },
+    )
     return get_job_service(request).cancel_job(job_id)
 
 

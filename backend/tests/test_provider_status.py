@@ -46,8 +46,13 @@ def test_provider_live_status_requires_explicit_server_opt_in(tmp_path, monkeypa
         "backend.app.api.v1.provider.create_wavespeed_provider_client",
         unexpected_client,
     )
-    response = _client(tmp_path, wavespeed_api_key="configured").get(
-        "/api/provider/wavespeed/status?live=true"
+    response = _client(
+        tmp_path,
+        wavespeed_api_key="configured",
+        admin_api_keys=["test-admin-key"],
+    ).get(
+        "/api/provider/wavespeed/status?live=true",
+        headers={"Authorization": "Bearer test-admin-key"},
     )
 
     assert response.status_code == 200
@@ -75,7 +80,11 @@ def test_enabled_live_status_only_initializes_client(tmp_path, monkeypatch) -> N
         tmp_path,
         wavespeed_api_key="ultra-secret-token",
         allow_provider_live_checks=True,
-    ).get("/api/provider/wavespeed/status?live=true")
+        admin_api_keys=["test-admin-key"],
+    ).get(
+        "/api/provider/wavespeed/status?live=true",
+        headers={"Authorization": "Bearer test-admin-key"},
+    )
 
     assert response.status_code == 200
     assert response.json()["live_check_status"] == "client_initialized"

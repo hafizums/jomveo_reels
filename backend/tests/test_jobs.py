@@ -59,6 +59,7 @@ EXPECTED_PROGRESS_TOTALS = {
     "scene_animation.generate": 1,
     "video.generate": 5,
 }
+ADMIN_HEADERS = {"Authorization": "Bearer test-admin-key"}
 
 
 class StubResult:
@@ -125,6 +126,7 @@ def job_app(tmp_path, monkeypatch) -> Iterator[tuple[TestClient, FastAPI]]:
         generated_root=tmp_path / "generated",
         database_url=f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}",
         queue_backend="inline",
+        admin_api_keys=["test-admin-key"],
         job_retry_backoff_seconds=0,
         job_stale_after_seconds=1,
     )
@@ -313,7 +315,7 @@ def test_stale_recovery_requeues_remaining_attempts_and_fails_exhausted(job_app)
         recoverable_id = recoverable.id
         exhausted_id = exhausted.id
 
-    response = client.post("/api/jobs/recover-stale")
+    response = client.post("/api/jobs/recover-stale", headers=ADMIN_HEADERS)
 
     assert response.status_code == 200
     assert response.json() == {"recovered_stale": 2, "requeued_due": 1}
@@ -336,7 +338,7 @@ def test_job_can_be_cancelled_before_execution(job_app) -> None:
         session.commit()
         job_id = job.id
 
-    response = client.post(f"/api/jobs/{job_id}/cancel")
+    response = client.post(f"/api/jobs/{job_id}/cancel", headers=ADMIN_HEADERS)
     assert response.status_code == 200
     assert response.json() == {"job_id": job_id, "status": "cancelled"}
     assert client.get(f"/api/jobs/{job_id}").json()["status"] == "cancelled"
