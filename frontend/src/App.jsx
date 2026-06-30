@@ -126,6 +126,7 @@ export default function App() {
   const [dashboardRefresh, setDashboardRefresh] = useState(0);
   const [queueMessage, setQueueMessage] = useState("");
   const [queueError, setQueueError] = useState("");
+  const [queueLoading, setQueueLoading] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState(defaultScriptPreset.id);
   const [selectedVoiceStyleId, setSelectedVoiceStyleId] = useState(defaultVoiceStyle.id);
   const [selectedMusicPresetId, setSelectedMusicPresetId] = useState(defaultMusicPreset.id);
@@ -688,9 +689,9 @@ export default function App() {
       );
     }
     try {
-      const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, selectedProjectId);
+      setQueueLoading(true); const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, selectedProjectId);
       setQueueMessage(`Queued project job ${accepted.job_id}.`); setDashboardRefresh(value => value + 1);
-    } catch (error) { setQueueError(error.message); }
+    } catch (error) { setQueueError(error.message); } finally { setQueueLoading(false); }
   };
 
   return (
@@ -700,7 +701,7 @@ export default function App() {
 
       <section className="tabs-shell">
         <GeneratorTabs activeTab={activeTab} onChange={setActiveTab} />
-        {activeTab !== "captions" ? <div className="queue-control"><button type="button" onClick={() => queueProjectJob()}>{`Queue ${activeTab === "scripts" ? "script" : activeTab === "voiceover" ? "voiceover" : activeTab === "music" ? "music" : activeTab === "art" ? "art" : activeTab === "animation" ? "animation" : "video"} job`}</button>{activeTab === "art" ? <button type="button" onClick={() => queueProjectJob("art-style/scenes")}>Queue scene sequence job</button> : null}<p>Project jobs use the selected project, billing credits, quota checks, and appear in the dashboard.</p>{queueMessage ? <p className="message success">{queueMessage}</p> : null}{queueError ? <p className="message error">{queueError}</p> : null}</div> : <p className="helper-text">Caption rendering currently runs synchronously.</p>}
+        {activeTab !== "captions" ? <div className="queue-control"><button type="button" disabled={queueLoading} onClick={() => queueProjectJob()}>{queueLoading?"Queueing…":`Queue ${activeTab === "scripts" ? "script" : activeTab === "voiceover" ? "voiceover" : activeTab === "music" ? "music" : activeTab === "art" ? "art" : activeTab === "animation" ? "animation" : "video"} job`}</button>{activeTab === "art" ? <button type="button" disabled={queueLoading} onClick={() => queueProjectJob("art-style/scenes")}>{queueLoading?"Queueing…":"Queue scene sequence job"}</button> : null}<p>Project jobs use the selected project, billing credits, quota checks, and appear in the dashboard.</p>{queueMessage ? <p className="message success">{queueMessage}</p> : null}{queueError ? <p className="message error">{queueError}</p> : null}</div> : <p className="helper-text">Caption rendering currently runs synchronously.</p>}
 
         {activeTab === "scripts" ? (
           <ScriptGeneratorSection

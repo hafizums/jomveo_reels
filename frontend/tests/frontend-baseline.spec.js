@@ -150,3 +150,11 @@ test("missing project and prerequisites show friendly errors without wrong reque
   await expect(page.getByText("Generate the required source content before queueing this project job.")).toBeVisible(); expect(queueCalls).toBe(0);
   await page.getByRole("tab", { name: "Caption Style" }).click(); await expect(page.getByText("Caption rendering currently runs synchronously.")).toBeVisible(); await expect(page.getByRole("button", { name: /Queue/ })).toHaveCount(0);
 });
+
+test("mobile dashboard and tabs avoid horizontal page overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Projects, jobs & temporary assets" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Generator tabs" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
