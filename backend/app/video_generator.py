@@ -3,18 +3,21 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
+from time import perf_counter
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from backend.app.caption_style_generator import (
     CaptionStyleRequest,
+    VideoQuality,
     generate_caption_style_video,
 )
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.errors import MediaProcessingError, ValidationAppError
 from backend.app.media.cleanup import cleanup_paths
 from backend.app.media.downloader import RemoteAssetDownloader
+from backend.app.media.timing import ProcessingTiming, processing_timing
 
 VIDEO_OUTPUT_DIRECTORY = Path(__file__).resolve().parents[1] / "generated" / "videos"
 FPS = 30
@@ -44,6 +47,8 @@ class VideoGenerationRequest(BaseModel):
     caption_template: str = Field(default="minimalist", min_length=1, max_length=100)
     caption_style_name: str = Field(default="Minimalist", max_length=80)
     language_hint: str = Field(default="", max_length=20)
+    reference_script: str = Field(default="", max_length=10000)
+    video_quality: VideoQuality = "middle"
 
 
 class VideoGenerationResponse(BaseModel):
@@ -58,6 +63,9 @@ class VideoGenerationResponse(BaseModel):
     captioned: bool
     output_path: str
     output_url: str
+    processing_timings: list[ProcessingTiming] = Field(default_factory=list)
+    filtered_subtitle_cues: int = Field(default=0, ge=0)
+    video_quality: VideoQuality = "middle"
 
 
 def _run_command(command: list[str], operation: str, timeout: int = 1800) -> None:
@@ -235,6 +243,8 @@ def generate_video(
     downloader: RemoteAssetDownloader | None = None,
     settings: Settings | None = None,
 ) -> VideoGenerationResponse:
+    total_started = perf_counter()
+    timings: list[ProcessingTiming] = []
     settings = settings or get_settings()
     if not shutil.which("ffmpeg"):
         raise MediaProcessingError("FFmpeg is not installed or available on PATH.")
@@ -258,6 +268,7 @@ def generate_video(
     downloader = downloader or RemoteAssetDownloader(settings)
     source_kind = "video" if payload.visual_source == "animated" else "image"
     source_paths: list[Path] = []
+    download_started = perf_counter()
     try:
         for index, url in enumerate(source_urls, start=1):
             source_paths.append(
@@ -287,12 +298,18 @@ def generate_video(
     finally:
         if owns_downloader:
             downloader.close()
+    timings.append(
+        processing_timing(
+            "download_assets", "Download source assets", perf_counter() - download_started
+        )
+    )
 
     width, height = ASPECT_DIMENSIONS[payload.aspect_ratio]
     total_frames = payload.duration_seconds * FPS
     base_frames, extra_frames = divmod(total_frames, len(source_paths))
     segment_paths: list[Path] = []
 
+    render_started = perf_counter()
     for index, source_path in enumerate(source_paths):
         frame_count = base_frames + (1 if index < extra_frames else 0)
         segment_path = segments_directory / f"scene-{index + 1:02d}.mp4"
@@ -301,11 +318,19 @@ def generate_video(
         else:
             _render_scene_segment(source_path, segment_path, width, height, frame_count)
         segment_paths.append(segment_path)
+    timings.append(
+        processing_timing("render_scenes", "Render scene clips", perf_counter() - render_started)
+    )
 
     visuals_path = job_directory / "visuals.mp4"
+    merge_started = perf_counter()
     _concat_segments(segment_paths, job_directory / "segments.txt", visuals_path)
+    timings.append(
+        processing_timing("merge_scenes", "Merge scene clips", perf_counter() - merge_started)
+    )
 
     assembled_path = job_directory / "video.mp4"
+    audio_started = perf_counter()
     _mix_audio(
         visuals_path,
         voiceover_path,
@@ -314,6 +339,7 @@ def generate_video(
         payload.duration_seconds,
         payload.music_volume,
     )
+    timings.append(processing_timing("mix_audio", "Mix audio", perf_counter() - audio_started))
 
     caption_result = generate_caption_style_video(
         CaptionStyleRequest(
@@ -323,11 +349,21 @@ def generate_video(
             language_hint=payload.language_hint,
             style_name=payload.caption_style_name,
             output_basename=f"video-{job_id}-final",
+            reference_script=payload.reference_script,
+            video_quality=payload.video_quality,
         ),
         settings=settings,
     )
+    timings.extend(
+        timing
+        for timing in caption_result.processing_timings
+        if timing.step in {"transcription", "caption_render"}
+    )
     output_path = Path(caption_result.output_path)
     output_url = caption_result.output_url
+    timings.append(
+        processing_timing("total", "Total processing time", perf_counter() - total_started)
+    )
 
     return VideoGenerationResponse(
         job_id=job_id,
@@ -341,4 +377,7 @@ def generate_video(
         captioned=True,
         output_path=str(output_path),
         output_url=output_url,
+        processing_timings=timings,
+        filtered_subtitle_cues=int(caption_result.raw_output.get("filtered_trailing_cues", 0)),
+        video_quality=payload.video_quality,
     )

@@ -1,5 +1,8 @@
 import SectionHeading from "./SectionHeading";
 
+const formatDuration = (seconds) =>
+  seconds < 1 ? `${Math.round(seconds * 1000)} ms` : `${seconds.toFixed(2)} s`;
+
 export default function VideoGeneratorSection({
   form,
   result,
@@ -14,6 +17,7 @@ export default function VideoGeneratorSection({
   captionStylePresets,
   durationOptions,
   aspectRatioOptions,
+  qualityOptions,
   onFieldChange,
   onSubmit,
 }) {
@@ -91,6 +95,18 @@ export default function VideoGeneratorSection({
           </label>
 
           <label>
+            Video Quality
+            <select name="video_quality" value={form.video_quality} onChange={onFieldChange}>
+              {qualityOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <span className="helper-text">
+              Lower quality renders captions faster; higher quality takes longer.
+            </span>
+          </label>
+
+          <label>
             Music Volume
             <input
               type="range"
@@ -134,9 +150,28 @@ export default function VideoGeneratorSection({
                 {result.width} × {result.height} · {result.duration_seconds} seconds · {result.scene_count} scenes
               </p>
               <p className="script-event">Captions: Burned in</p>
+              <p className="script-event">Quality: {result.video_quality.replace("_", " ")}</p>
               <p className="script-event">
                 Visuals: {result.visual_source === "animated" ? "Animated scene clips" : "Still images"}
               </p>
+              {result.filtered_subtitle_cues > 0 ? (
+                <p className="message success">
+                  Removed {result.filtered_subtitle_cues} suspicious trailing subtitle {result.filtered_subtitle_cues === 1 ? "cue" : "cues"}.
+                </p>
+              ) : null}
+              {result.processing_timings?.length ? (
+                <section className="processing-timings" aria-labelledby="processing-time-heading">
+                  <h3 id="processing-time-heading">Processing time</h3>
+                  <dl>
+                    {result.processing_timings.map((timing) => (
+                      <div key={timing.step} className={timing.step === "total" ? "timing-total" : ""}>
+                        <dt>{timing.label}</dt>
+                        <dd>{formatDuration(timing.duration_seconds)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ) : null}
               <a href={result.output_url} target="_blank" rel="noreferrer">Open final video</a>
             </div>
           ) : (

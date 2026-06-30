@@ -22,6 +22,7 @@ def test_caption_upload_route_persists_validated_safe_video(tmp_path, monkeypatc
 
     def fake_caption_render(payload, **_kwargs):
         assert Path(payload.input_video_path).is_file()
+        assert payload.transcript_path == ""
         return CaptionStyleResponse(
             **payload.model_dump(),
             output_path=str(root / "captions" / "safe.mp4"),
@@ -50,6 +51,56 @@ def test_caption_upload_route_persists_validated_safe_video(tmp_path, monkeypatc
     uploads = list((root / "uploads" / "captions" / "videos").glob("*.mp4"))
     assert len(uploads) == 1
     assert ".." not in uploads[0].name
+
+
+def test_caption_upload_route_passes_uploaded_transcript_to_renderer(tmp_path, monkeypatch) -> None:
+    root = tmp_path / "generated"
+    settings = Settings(
+        _env_file=None,
+        app_env="test",
+        generated_root=root,
+        local_storage_root=root,
+        database_url=f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}",
+        transcription_provider="openai",
+        openai_api_key="unused-because-upload-wins",
+    )
+
+    def fake_caption_render(payload, **_kwargs):
+        assert Path(payload.input_video_path).is_file()
+        assert Path(payload.transcript_path).read_text(encoding="utf-8").startswith("WEBVTT")
+        assert payload.transcript_format == "vtt"
+        return CaptionStyleResponse(
+            **payload.model_dump(),
+            output_path=str(root / "captions" / "safe.mp4"),
+            output_url="/generated/captions/safe.mp4",
+            command=["pycaps", "render", "--transcript", payload.transcript_path],
+            raw_output={"mocked": True},
+        )
+
+    monkeypatch.setattr(
+        "backend.app.api.v1.captions.generate_caption_style_video",
+        fake_caption_render,
+    )
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/caption-style/generate",
+            data={"transcript_format": "vtt"},
+            files={
+                "input_video": (
+                    "clip.mp4",
+                    b"\x00\x00\x00\x18ftypmp42video",
+                    "video/mp4",
+                ),
+                "transcript": (
+                    "captions.vtt",
+                    b"WEBVTT\n\n00:00.000 --> 00:01.000\nHello",
+                    "text/vtt",
+                ),
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["transcript_format"] == "vtt"
 
 
 class FakeDownloader:
@@ -87,23 +138,27 @@ def test_video_generator_uses_safe_downloader_boundary(tmp_path, monkeypatch) ->
         "_mix_audio",
         lambda _visuals, _voice, _music, output, *_args: output.write_bytes(b"video"),
     )
-    monkeypatch.setattr(
-        video_module,
-        "generate_caption_style_video",
-        lambda payload, **_kwargs: CaptionStyleResponse(
+    caption_payloads = []
+
+    def fake_caption_generator(payload, **_kwargs):
+        caption_payloads.append(payload)
+        return CaptionStyleResponse(
             **payload.model_dump(),
             output_path=str(tmp_path / "final.mp4"),
             output_url="/generated/captions/final.mp4",
             command=[],
-            raw_output={"mocked": True},
-        ),
-    )
+            raw_output={"mocked": True, "filtered_trailing_cues": 2},
+        )
+
+    monkeypatch.setattr(video_module, "generate_caption_style_video", fake_caption_generator)
     downloader = FakeDownloader()
     response = generate_video(
         VideoGenerationRequest(
             image_urls=["https://example.com/image.png"],
             voiceover_url="https://example.com/voice.mp3",
             duration_seconds=5,
+            reference_script="Reference narration text.",
+            video_quality="low",
         ),
         downloader=downloader,  # type: ignore[arg-type]
         settings=Settings(
@@ -114,6 +169,17 @@ def test_video_generator_uses_safe_downloader_boundary(tmp_path, monkeypatch) ->
     )
 
     assert response.captioned is True
+    assert response.filtered_subtitle_cues == 2
+    assert caption_payloads[0].reference_script == "Reference narration text."
+    assert caption_payloads[0].video_quality == "low"
+    assert response.video_quality == "low"
+    assert [timing.step for timing in response.processing_timings] == [
+        "download_assets",
+        "render_scenes",
+        "merge_scenes",
+        "mix_audio",
+        "total",
+    ]
     assert downloader.calls == [
         ("https://example.com/image.png", "image"),
         ("https://example.com/voice.mp3", "audio"),
