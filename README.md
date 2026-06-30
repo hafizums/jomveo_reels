@@ -81,7 +81,8 @@ frontend/
    playwright install chromium
    ```
 
-   The first caption render may also download a Whisper model for transcription.
+   To transcribe through the OpenAI API instead of relying on local transcription,
+   configure the optional backend-only settings described below.
 
 5. Start FastAPI:
 
@@ -123,6 +124,65 @@ The Video Creator uses the latest generated assets held by the React app:
 Supported aspect ratios are vertical `9:16` (`1080x1920`), landscape `16:9` (`1920x1080`), square `1:1` (`1080x1080`), and portrait `4:5` (`1080x1350`). For stills, FFmpeg applies a subtle pan and zoom. For animated scenes, it loops or trims the Wan clips to fill the selected timeline. It then mixes narration and optional background music. The assembled video is always passed through the selected `pycaps` template, so every final video includes burned-in captions.
 
 Video jobs and their downloaded source assets are stored under `backend/generated/videos/<job-id>`. Captioned final outputs are stored under `backend/generated/captions`.
+
+## Optional OpenAI caption transcription
+
+Caption rendering still runs locally through `pycaps` and FFmpeg. When no transcript is
+uploaded, the backend can first call OpenAI transcription and save an SRT or VTT file
+under `backend/generated/captions/transcripts`. Uploaded transcripts always take
+priority over automatic transcription.
+
+Add these values only to `backend/.env`; never expose `OPENAI_API_KEY` through a
+`VITE_*` variable:
+
+```env
+OPENAI_API_KEY=sk-...
+TRANSCRIPTION_PROVIDER=openai
+TRANSCRIPTION_MODEL=whisper-1
+TRANSCRIPTION_OUTPUT_FORMAT=srt
+TRANSCRIPTION_PROMPT=
+TRANSCRIPTION_TIMEOUT_SECONDS=600
+```
+
+`whisper-1` is the default because it supports timestamped `srt` and `vtt` responses
+that `pycaps` can consume directly. Leave `TRANSCRIPTION_PROVIDER=none` to preserve the
+existing caption behavior without an OpenAI request. `pycaps`, its browser runtime, and
+FFmpeg remain required to render the final captioned MP4.
+
+Start both services for a manual UI test:
+
+```bash
+uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+cd frontend
+npm run dev
+```
+
+Open `/generate`, choose **Caption Style**, upload a short video containing speech,
+leave the transcript upload empty, and submit. Confirm an SRT transcript is created and
+the captioned MP4 is available. The same flow can be tested directly:
+
+```bash
+curl -X POST "http://localhost:8000/api/caption-style/generate" \
+  -F "input_video=@sample.mp4" \
+  -F "template_name=minimalist" \
+  -F "transcript_format=srt" \
+  -F "language_hint=ms" \
+  -F "style_name=Minimalist"
+```
+
+With OpenAI transcription enabled, the response includes the generated
+`transcript_path`, uses `transcript_format=srt`, includes `--transcript` in the pycaps
+command, and returns the captioned `output_url`.
+
+Final video generation returns a `processing_timings` breakdown for asset downloads,
+scene rendering, scene merging, audio mixing, OpenAI transcription, caption burning, and
+total elapsed time. The Video Creator displays these timings after a successful render.
+Video Creator also exposes pycaps quality levels: `low` (fastest), `middle` (the
+backward-compatible default), `high`, and `very_high` (slowest). Lower quality can reduce
+caption-render time at the cost of output compression quality.
+When the video request includes the script used for its voiceover, auto-generated SRT/VTT
+captions are compared with that script and unmatched trailing cues are removed
+conservatively. Uploaded transcripts are never filtered.
 
 ## Notes about WaveSpeed API usage
 

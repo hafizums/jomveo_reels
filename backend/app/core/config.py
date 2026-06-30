@@ -54,6 +54,16 @@ class Settings(BaseSettings):
     remote_download_timeout_seconds: int = 60
     allow_private_network_downloads: bool = False
     allowed_remote_asset_schemes: list[str] = Field(default_factory=lambda: ["https", "http"])
+    openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
+    transcription_provider: str = Field(default="none", validation_alias="TRANSCRIPTION_PROVIDER")
+    transcription_model: str = Field(default="whisper-1", validation_alias="TRANSCRIPTION_MODEL")
+    transcription_output_format: str = Field(
+        default="srt", validation_alias="TRANSCRIPTION_OUTPUT_FORMAT"
+    )
+    transcription_prompt: str = Field(default="", validation_alias="TRANSCRIPTION_PROMPT")
+    transcription_timeout_seconds: int = Field(
+        default=600, ge=1, validation_alias="TRANSCRIPTION_TIMEOUT_SECONDS"
+    )
     database_url: str = "sqlite:///backend/generated/jomveo.db"
     queue_backend: str = "inline"
     redis_url: str = "redis://localhost:6379/0"
@@ -69,6 +79,7 @@ class Settings(BaseSettings):
         env_file=BACKEND_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     @field_validator("debug", mode="before")
@@ -96,6 +107,36 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_admin_api_keys(cls, value: list[str]) -> list[str]:
         return [key.strip() for key in value if key.strip()]
+
+    @field_validator(
+        "default_daily_job_limit",
+        "default_monthly_job_limit",
+        "default_daily_credit_limit",
+        "default_monthly_credit_limit",
+        "default_max_concurrent_jobs",
+        mode="before",
+    )
+    @classmethod
+    def blank_optional_limits_are_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("transcription_provider")
+    @classmethod
+    def validate_transcription_provider(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if normalized not in {"none", "openai"}:
+            raise ValueError("TRANSCRIPTION_PROVIDER must be 'none' or 'openai'.")
+        return normalized
+
+    @field_validator("transcription_output_format")
+    @classmethod
+    def validate_transcription_output_format(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if normalized not in {"srt", "vtt"}:
+            raise ValueError("TRANSCRIPTION_OUTPUT_FORMAT must be 'srt' or 'vtt'.")
+        return normalized
 
 
 @lru_cache

@@ -57,6 +57,7 @@ import {
 import {
   videoAspectRatioOptions,
   videoDurationOptions,
+  videoQualityOptions,
 } from "./data/videoOptions";
 
 const initialScriptForm = {
@@ -117,6 +118,7 @@ const initialVideoForm = {
   music_volume: 0.16,
   caption_style_id: "hype",
   visual_source: "stills",
+  video_quality: "middle",
 };
 
 const initialSceneAnimationForm = {
@@ -681,6 +683,8 @@ export default function App() {
           caption_template: videoCaptionPreset.templateName,
           caption_style_name: videoCaptionPreset.title,
           language_hint: scriptResult?.language === "Malay" ? "ms" : "en",
+          reference_script: voiceForm.text || scriptResult?.script || "",
+          video_quality: videoForm.video_quality,
         }),
       });
 
@@ -864,6 +868,7 @@ export default function App() {
             captionStylePresets={captionStylePresets}
             durationOptions={videoDurationOptions}
             aspectRatioOptions={videoAspectRatioOptions}
+            qualityOptions={videoQualityOptions}
             onFieldChange={updateVideoField}
             onSubmit={handleVideoSubmit}
           />

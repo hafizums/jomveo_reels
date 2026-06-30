@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from backend.app.core.config import Settings
 
 
@@ -48,6 +51,12 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.allow_provider_live_checks is False
     assert settings.provider_smoke_test_model == "wavespeed-ai/z-image/turbo"
     assert settings.provider_smoke_test_timeout_seconds == 120
+    assert settings.openai_api_key == ""
+    assert settings.transcription_provider == "none"
+    assert settings.transcription_model == "whisper-1"
+    assert settings.transcription_output_format == "srt"
+    assert settings.transcription_prompt == ""
+    assert settings.transcription_timeout_seconds == 600
 
 
 def test_settings_load_environment_variables(monkeypatch) -> None:
@@ -62,3 +71,22 @@ def test_settings_load_environment_variables(monkeypatch) -> None:
     assert settings.log_level == "DEBUG"
     assert settings.admin_auth_enabled is True
     assert settings.admin_api_keys == ["first-admin-key", "second-admin-key"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("transcription_provider", "local"), ("transcription_output_format", "json")],
+)
+def test_transcription_settings_reject_unsupported_values(field, value) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **{field: value})
+
+
+def test_blank_optional_limits_are_loaded_as_none(monkeypatch) -> None:
+    monkeypatch.setenv("DEFAULT_DAILY_CREDIT_LIMIT", "")
+    monkeypatch.setenv("DEFAULT_MONTHLY_CREDIT_LIMIT", "   ")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.default_daily_credit_limit is None
+    assert settings.default_monthly_credit_limit is None
