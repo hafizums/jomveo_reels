@@ -10,6 +10,7 @@ import ScriptGeneratorSection from "./components/ScriptGeneratorSection";
 import VoiceoverGeneratorSection from "./components/VoiceoverGeneratorSection";
 import VideoGeneratorSection from "./components/VideoGeneratorSection";
 import SceneAnimationSection from "./components/SceneAnimationSection";
+import { backend, defaultProjectId } from "./lib/api";
 import {
   artStylePresets,
   defaultArtStylePreset,
@@ -118,6 +119,12 @@ const initialSceneAnimationForm = {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("scripts");
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    localStorage.getItem("jomveo.selectedProjectId") || defaultProjectId,
+  );
+  const [dashboardRefresh, setDashboardRefresh] = useState(0);
+  const [queueMessage, setQueueMessage] = useState("");
+  const [queueError, setQueueError] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState(defaultScriptPreset.id);
   const [selectedVoiceStyleId, setSelectedVoiceStyleId] = useState(defaultVoiceStyle.id);
   const [selectedMusicPresetId, setSelectedMusicPresetId] = useState(defaultMusicPreset.id);
@@ -664,19 +671,47 @@ export default function App() {
     }
   };
 
+  const queueConfiguration = (requestedKind) => {
+    if (activeTab === "scripts") return ["scripts", scriptForm, "script"];
+    if (activeTab === "voiceover") {
+      if (!voiceForm.text.trim()) return null;
+      return ["voiceovers", voiceForm, "voiceover"];
+    }
+    if (activeTab === "music") return ["background-music", musicForm, "music"];
+    if (activeTab === "art") {
+      if (requestedKind === "art-style/scenes") return scriptResult?.script ? ["art-style/scenes", { script: scriptResult.script, title: scriptResult.title, event_name: scriptResult.event_name, duration_seconds: scriptResult.duration_seconds, planner_model: "openai/gpt-5.4-mini", style_name: artForm.style_name, art_direction: artForm.art_direction, model: artForm.model, enable_safety_checker: artForm.enable_safety_checker }, "scene sequence"] : null;
+      return ["art-style", artForm, "art"];
+    }
+    if (activeTab === "animation" && artSceneResult?.scenes?.length) return ["scene-animations", { duration: sceneAnimationForm.duration, negative_prompt: sceneAnimationForm.negative_prompt, model: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast", scenes: artSceneResult.scenes.map(scene => ({ scene_number: scene.scene_number, image_url: scene.image_url, motion_prompt: scene.motion_prompt })) }, "animation"];
+    if (activeTab === "video" && artSceneResult?.scenes?.length && voiceResult?.audio_url) return ["videos", { title: scriptResult?.title || "Generated video", duration_seconds: videoForm.duration_seconds, aspect_ratio: videoForm.aspect_ratio, visual_source: videoForm.visual_source, image_urls: artSceneResult.scenes.map(scene => scene.image_url), video_urls: sceneAnimationResult?.scenes?.map(scene => scene.video_url) || [], voiceover_url: voiceResult.audio_url, music_url: musicResult?.audio_urls?.[0] || "", music_volume: videoForm.music_volume, caption_template: (captionStylePresets.find(preset => preset.id === videoForm.caption_style_id) ?? defaultCaptionStylePreset).templateName, caption_style_name: (captionStylePresets.find(preset => preset.id === videoForm.caption_style_id) ?? defaultCaptionStylePreset).title, language_hint: scriptResult?.language === "Malay" ? "ms" : "en" }, "video"];
+    return null;
+  };
+
+  const queueProjectJob = async (requestedKind) => {
+    setQueueError(""); setQueueMessage("");
+    if (!selectedProjectId) return setQueueError("Please select or create a project before queueing a project job.");
+    const configuration = queueConfiguration(requestedKind);
+    if (!configuration) {
+      return setQueueError(
+        activeTab === "voiceover"
+          ? "Enter voiceover text before queueing this project job."
+          : "Generate the required source content before queueing this project job.",
+      );
+    }
+    try {
+      const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, selectedProjectId);
+      setQueueMessage(`Queued project job ${accepted.job_id}.`); setDashboardRefresh(value => value + 1);
+    } catch (error) { setQueueError(error.message); }
+  };
+
   return (
     <main className="page">
       <HeroSection />
-      <Dashboard
-        jobDrafts={{
-          scripts: scriptForm,
-          "art-style": artForm,
-          "background-music": musicForm,
-        }}
-      />
+      <Dashboard projectId={selectedProjectId} onProjectChange={setSelectedProjectId} refreshToken={dashboardRefresh} />
 
       <section className="tabs-shell">
         <GeneratorTabs activeTab={activeTab} onChange={setActiveTab} />
+        {activeTab !== "captions" ? <div className="queue-control"><button type="button" onClick={() => queueProjectJob()}>{`Queue ${activeTab === "scripts" ? "script" : activeTab === "voiceover" ? "voiceover" : activeTab === "music" ? "music" : activeTab === "art" ? "art" : activeTab === "animation" ? "animation" : "video"} job`}</button>{activeTab === "art" ? <button type="button" onClick={() => queueProjectJob("art-style/scenes")}>Queue scene sequence job</button> : null}<p>Project jobs use the selected project, billing credits, quota checks, and appear in the dashboard.</p>{queueMessage ? <p className="message success">{queueMessage}</p> : null}{queueError ? <p className="message error">{queueError}</p> : null}</div> : <p className="helper-text">Caption rendering currently runs synchronously.</p>}
 
         {activeTab === "scripts" ? (
           <ScriptGeneratorSection

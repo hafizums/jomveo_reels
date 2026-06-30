@@ -395,6 +395,17 @@ stored under `jomveo.selectedProjectId`. A configured admin key reveals the loca
 top-up form; payments and invoices are not implemented. Existing synchronous generator
 forms remain available beneath the workspace dashboard.
 
+## Frontend baseline tests
+
+Run `cd frontend` followed by `npm run test:e2e`. The Playwright suite mocks backend
+APIs and characterizes the current dashboard, project persistence, job headers/details,
+asset warnings, and legacy generator tabs before future frontend refactors.
+
+Every supported JSON generator also has a secondary project-job control. These controls
+reuse the selected dashboard project, send `X-Project-ID` and an idempotency key, refresh
+the dashboard after acceptance, and leave the original synchronous generation buttons
+unchanged. Caption rendering remains synchronous because it has no persistent job route.
+
 ## Housekeeping audit
 
 Run `python -m backend.app.housekeeping.outdated_info_audit` for a read-only Markdown
