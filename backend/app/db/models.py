@@ -48,6 +48,9 @@ class GenerationJob(Base):
     created_by_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    estimated_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reserved_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     provider_runs: Mapped[list["ProviderRun"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
@@ -161,3 +164,112 @@ class AuditLog(Base):
     )
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CreditAccount(Base):
+    __tablename__ = "credit_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    currency: Mapped[str] = mapped_column(String(3), default="USD")
+    balance_credits: Mapped[int] = mapped_column(Integer, default=0)
+    reserved_credits: Mapped[int] = mapped_column(Integer, default=0)
+    lifetime_purchased_credits: Mapped[int] = mapped_column(Integer, default=0)
+    lifetime_used_credits: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CreditTransaction(Base):
+    __tablename__ = "credit_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id: Mapped[str] = mapped_column(ForeignKey("credit_accounts.id", ondelete="CASCADE"))
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="SET NULL"), nullable=True
+    )
+    type: Mapped[str] = mapped_column(String(30), index=True)
+    amount_credits: Mapped[int] = mapped_column(Integer)
+    balance_after_credits: Mapped[int] = mapped_column(Integer)
+    reserved_after_credits: Mapped[int] = mapped_column(Integer)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class JobCostEstimate(Base):
+    __tablename__ = "job_cost_estimates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="CASCADE"), unique=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    estimated_credits: Mapped[int] = mapped_column(Integer)
+    reserved_credits: Mapped[int] = mapped_column(Integer)
+    pricing_version: Mapped[str] = mapped_column(String(30))
+    estimate_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ProviderCostRecord(Base):
+    __tablename__ = "provider_cost_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    provider_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("provider_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="CASCADE"), index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    provider: Mapped[str] = mapped_column(String(100))
+    model: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    estimated_credits: Mapped[int] = mapped_column(Integer, default=0)
+    actual_credits: Mapped[int] = mapped_column(Integer, default=0)
+    pricing_version: Mapped[str] = mapped_column(String(30))
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ProjectQuota(Base):
+    __tablename__ = "project_quotas"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), unique=True
+    )
+    daily_job_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_job_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_credit_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_credit_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_concurrent_jobs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class RateLimitEvent(Base):
+    __tablename__ = "rate_limit_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    key: Mapped[str] = mapped_column(String(100))
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    window_seconds: Mapped[int] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from backend.app.application.billing.service import BillingService
 from backend.app.application.jobs.schemas import JobListResponse
 from backend.app.application.jobs.service import job_to_detail
 from backend.app.application.projects.permissions import require_project_role
@@ -17,6 +18,7 @@ from backend.app.application.projects.schemas import (
     ProjectUpdateRequest,
 )
 from backend.app.auth.models import AuthenticatedPrincipal
+from backend.app.core.config import Settings
 from backend.app.core.errors import AuthForbiddenError, ValidationAppError
 from backend.app.db.models import Project, ProjectMember, User
 from backend.app.db.session import SessionFactory
@@ -55,8 +57,9 @@ def _slug(value: str) -> str:
 
 
 class ProjectService:
-    def __init__(self, session_factory: SessionFactory) -> None:
+    def __init__(self, session_factory: SessionFactory, settings: Settings) -> None:
         self.session_factory = session_factory
+        self.settings = settings
 
     def create(
         self, principal: AuthenticatedPrincipal, payload: ProjectCreateRequest
@@ -73,6 +76,7 @@ class ProjectService:
             if principal.user_id is not None:
                 repository.add_member(project.id, principal.user_id, "owner")
                 role = "owner"
+            BillingService(session, self.settings).ensure_project(project.id)
             AuditLogRepository(session).record(
                 principal, "project_created", "project", project.id, project.id
             )

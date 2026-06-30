@@ -26,6 +26,20 @@ class ProjectNotFoundError(AppError):
     code = "project_not_found"
 
 
+class BillingError(AppError):
+    code = "billing_error"
+
+
+class BillingInsufficientCreditsError(BillingError):
+    status_code = 402
+    code = "insufficient_credits"
+
+
+class QuotaExceededError(AppError):
+    status_code = 429
+    code = "quota_exceeded"
+
+
 class ProviderError(AppError):
     status_code = 502
     code = "provider_error"
