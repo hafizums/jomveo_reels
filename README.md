@@ -393,7 +393,13 @@ VITE_DEFAULT_PROJECT_ID=
 Without a user key, the frontend relies on backend demo mode. The selected project is
 stored under `jomveo.selectedProjectId`. A configured admin key reveals the local manual
 top-up form; payments and invoices are not implemented. Existing synchronous generator
-forms remain available beneath the workspace dashboard.
+forms remain available in the routed generator studio.
+
+The frontend workspace uses lightweight client-side routes. Open `/dashboard` for the
+project overview and `/generate` for all synchronous and persistent generator controls.
+Selected-project jobs, assets, and billing are available under `/projects/{project_id}`,
+and individual jobs open at `/jobs/{job_id}`. The top navigation keeps these pages
+connected while preserving `jomveo.selectedProjectId` across reloads.
 
 ## Frontend baseline tests
 
