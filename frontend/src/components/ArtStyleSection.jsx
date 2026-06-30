@@ -1,4 +1,5 @@
 import ArtStylePresetPicker from "./ArtStylePresetPicker";
+import ProjectActionCard from "./ProjectActionCard";
 import SectionHeading from "./SectionHeading";
 
 export default function ArtStyleSection({
@@ -17,6 +18,10 @@ export default function ArtStyleSection({
   onFieldChange,
   onSubmit,
   onSceneSubmit,
+  onQueue,
+  queueLoading,
+  queueMessage,
+  queueError,
 }) {
   return (
     <section className="stack">
@@ -51,7 +56,7 @@ export default function ArtStyleSection({
             onClick={onUseLatestScript}
             disabled={!hasScriptText}
           >
-            Use latest script as inspiration
+            ↑ Use latest script as inspiration
           </button>
 
           <label>
@@ -108,24 +113,34 @@ export default function ArtStyleSection({
             dedicated visual prompt for every story beat.
           </p>
 
+          {/* Primary: single image */}
           <button type="submit" disabled={loading || sceneLoading}>
-            {loading ? "Generating..." : "Generate art-style image"}
+            {loading ? "Generating…" : "Generate art-style image"}
           </button>
 
+          {/* Secondary: scene sequence (requires script) */}
           <button
             type="button"
             className="secondary-button"
             onClick={onSceneSubmit}
             disabled={!hasScriptText || loading || sceneLoading}
           >
-            {sceneLoading ? "Generating scene sequence..." : "Generate scenes from latest script"}
+            {sceneLoading ? "Generating scene sequence…" : "Generate scenes from latest script"}
           </button>
 
           {!hasScriptText ? (
-            <p className="helper-text">Generate a script to unlock scene-sequence generation.</p>
+            <p className="helper-text">Generate a script first to unlock scene-sequence generation.</p>
           ) : null}
 
           {error ? <p className="message error">{error}</p> : null}
+
+          <ProjectActionCard
+            label="Save art job to project"
+            onQueue={onQueue}
+            loading={queueLoading}
+            message={queueMessage}
+            error={queueError}
+          />
         </form>
 
         <section className="panel result-panel">

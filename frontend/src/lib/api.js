@@ -40,4 +40,7 @@ export const backend = {
   quotas: (id) => api(`/api/projects/${id}/quotas`),
   topUp: (id, body) => api(`/api/projects/${id}/billing/top-up`, { method: "POST", body, admin: true }),
   createJob: (kind, body, projectId) => api(jobRoute(kind), { method: "POST", body, projectId, idempotencyKey: crypto.randomUUID() }),
+  cancelJob: (jobId) => api(`/api/jobs/${jobId}/cancel`, { method: "POST", admin: true }),
+  recoverStale: () => api("/api/jobs/recover-stale", { method: "POST", admin: true }),
 };
+

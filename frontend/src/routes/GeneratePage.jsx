@@ -6,9 +6,9 @@ export default function GeneratePage({ children }) {
       <HeroSection />
       <header className="page-header">
         <div>
-          <p className="eyebrow">Generator studio</p>
+          <p className="eyebrow">Generator Studio</p>
           <h2>Generate project media</h2>
-          <p>Use the existing synchronous tools or queue supported work for the selected project.</p>
+          <p>Use the synchronous tools or queue supported work for the selected project.</p>
         </div>
       </header>
       {children}

@@ -1,3 +1,4 @@
+import ProjectActionCard from "./ProjectActionCard";
 import ScriptPresetPicker from "./ScriptPresetPicker";
 import SectionHeading from "./SectionHeading";
 
@@ -15,6 +16,10 @@ export default function ScriptGeneratorSection({
   onPresetSelect,
   onFieldChange,
   onSubmit,
+  onQueue,
+  queueLoading,
+  queueMessage,
+  queueError,
 }) {
   return (
     <section className="stack">
@@ -112,11 +117,21 @@ export default function ScriptGeneratorSection({
             />
           </label>
 
+          {/* Primary action: synchronous preview */}
           <button type="submit" disabled={loading}>
-            {loading ? "Writing..." : "Generate script"}
+            {loading ? "Writing…" : "Generate script"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
+
+          {/* Secondary action: async project job */}
+          <ProjectActionCard
+            label="Save script to project"
+            onQueue={onQueue}
+            loading={queueLoading}
+            message={queueMessage}
+            error={queueError}
+          />
         </form>
 
         <section className="panel result-panel script-panel">
@@ -138,7 +153,7 @@ export default function ScriptGeneratorSection({
             </div>
           ) : (
             <div className="empty-state">
-              <p>Your script will show up here.</p>
+              <p>Your script will appear here after generation.</p>
             </div>
           )}
         </section>

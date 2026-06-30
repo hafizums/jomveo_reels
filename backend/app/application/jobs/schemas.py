@@ -30,10 +30,12 @@ class JobDetailResponse(BaseModel):
     next_retry_at: datetime | None
     result: dict[str, Any] | None
     error: JobErrorResponse | None
+    input_payload: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
 
 
 class JobListResponse(BaseModel):

@@ -44,6 +44,7 @@ class VideoGenerationRequest(BaseModel):
     caption_template: str = Field(default="minimalist", min_length=1, max_length=100)
     caption_style_name: str = Field(default="Minimalist", max_length=80)
     language_hint: str = Field(default="", max_length=20)
+    whisper_prompt: str = Field(default="", max_length=8000)
 
 
 class VideoGenerationResponse(BaseModel):
@@ -323,6 +324,7 @@ def generate_video(
             language_hint=payload.language_hint,
             style_name=payload.caption_style_name,
             output_basename=f"video-{job_id}-final",
+            whisper_prompt=payload.whisper_prompt,
         ),
         settings=settings,
     )

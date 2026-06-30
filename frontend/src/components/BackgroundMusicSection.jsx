@@ -1,4 +1,5 @@
 import MusicPresetPicker from "./MusicPresetPicker";
+import ProjectActionCard from "./ProjectActionCard";
 import SectionHeading from "./SectionHeading";
 
 export default function BackgroundMusicSection({
@@ -14,6 +15,10 @@ export default function BackgroundMusicSection({
   onUseLatestScript,
   onFieldChange,
   onSubmit,
+  onQueue,
+  queueLoading,
+  queueMessage,
+  queueError,
 }) {
   return (
     <section className="stack">
@@ -48,7 +53,7 @@ export default function BackgroundMusicSection({
             onClick={onUseLatestScript}
             disabled={!hasScriptText}
           >
-            Use latest script as inspiration
+            ↑ Use latest script as inspiration
           </button>
 
           <p className="helper-text">
@@ -105,10 +110,18 @@ export default function BackgroundMusicSection({
           </label>
 
           <button type="submit" disabled={loading}>
-            {loading ? "Generating..." : "Generate background music"}
+            {loading ? "Generating…" : "Generate background music"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
+
+          <ProjectActionCard
+            label="Save music job to project"
+            onQueue={onQueue}
+            loading={queueLoading}
+            message={queueMessage}
+            error={queueError}
+          />
         </form>
 
         <section className="panel result-panel music-panel">

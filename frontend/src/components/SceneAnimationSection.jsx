@@ -1,3 +1,4 @@
+import ProjectActionCard from "./ProjectActionCard";
 import SectionHeading from "./SectionHeading";
 
 export default function SceneAnimationSection({
@@ -9,6 +10,10 @@ export default function SceneAnimationSection({
   sceneCount,
   onFieldChange,
   onSubmit,
+  onQueue,
+  queueLoading,
+  queueMessage,
+  queueError,
 }) {
   return (
     <section className="stack">
@@ -21,7 +26,9 @@ export default function SceneAnimationSection({
         <form className="panel form-panel" onSubmit={onSubmit}>
           <div className="source-list">
             <p className={hasScenes ? "source-ready" : "source-missing"}>
-              {hasScenes ? `✓ ${sceneCount} scene images ready` : "○ Generate an art scene sequence first"}
+              {hasScenes
+                ? `✓ ${sceneCount} scene images ready — proceed to animate`
+                : "○ Generate an Art Style scene sequence first (Step 3)"}
             </p>
           </div>
 
@@ -49,9 +56,18 @@ export default function SceneAnimationSection({
           </p>
 
           <button type="submit" disabled={!hasScenes || loading}>
-            {loading ? "Animating scenes..." : "Animate all scenes"}
+            {loading ? "Animating scenes…" : "Animate all scenes"}
           </button>
+
           {error ? <p className="message error">{error}</p> : null}
+
+          <ProjectActionCard
+            label="Save animation job to project"
+            onQueue={onQueue}
+            loading={queueLoading}
+            message={queueMessage}
+            error={queueError}
+          />
         </form>
 
         <section className="panel result-panel">

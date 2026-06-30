@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-
 import GeneratorTabs from "./components/GeneratorTabs";
 import CaptionStyleSection from "./components/CaptionStyleSection";
 import ArtStyleSection from "./components/ArtStyleSection";
@@ -9,6 +8,7 @@ import ScriptGeneratorSection from "./components/ScriptGeneratorSection";
 import VoiceoverGeneratorSection from "./components/VoiceoverGeneratorSection";
 import VideoGeneratorSection from "./components/VideoGeneratorSection";
 import SceneAnimationSection from "./components/SceneAnimationSection";
+import QueueMonitorDrawer from "./components/queue/QueueMonitorDrawer";
 import { backend, defaultProjectId } from "./lib/api";
 import { resolveQueueConfiguration } from "./lib/jobPayloads";
 import AppShell from "./routes/AppShell";
@@ -732,16 +732,89 @@ export default function App() {
       return;
     }
     try {
-      setQueueLoading(true); const [kind, payload] = configuration; const accepted = await backend.createJob(kind, payload, projectId);
-      setQueueMessage(`Queued project job ${accepted.job_id}.`); setDashboardRefresh(value => value + 1);
-    } catch (error) { setQueueError(error.message); } finally { setQueueLoading(false); }
+      setQueueLoading(true);
+      const [kind, payload] = configuration;
+      const accepted = await backend.createJob(kind, payload, projectId);
+      setQueueMessage(`Queued — job ${accepted.job_id} saved to project.`);
+      setDashboardRefresh(value => value + 1);
+    } catch (error) {
+      setQueueError(error.message);
+    } finally {
+      setQueueLoading(false);
+    }
+  };
+
+  // Which steps have results (drives completion dots in the pipeline sidebar)
+  const completedSteps = {
+    scripts:   Boolean(scriptResult),
+    voiceover: Boolean(voiceResult),
+    art:       Boolean(artResult || artSceneResult),
+    animation: Boolean(sceneAnimationResult),
+    music:     Boolean(musicResult),
+    video:     Boolean(videoResult),
+    captions:  Boolean(captionResult),
+  };
+
+  const handleImportQueueResult = (jobType, result) => {
+    if (!result) return;
+    switch (jobType) {
+      case "script.generate":
+        setScriptResult(result);
+        if (result.duration_seconds) {
+          setVideoForm((current) => ({
+            ...current,
+            duration_seconds: result.duration_seconds,
+          }));
+        }
+        setActiveTab("scripts");
+        break;
+      case "voiceover.generate":
+        setVoiceResult(result);
+        if (result.text) {
+          setVoiceForm((current) => ({
+            ...current,
+            text: result.text,
+          }));
+        }
+        setActiveTab("voiceover");
+        break;
+      case "background_music.generate":
+        setMusicResult(result);
+        setActiveTab("music");
+        break;
+      case "art_style.generate":
+        setArtResult(result);
+        setArtSceneResult(null);
+        setActiveTab("art");
+        break;
+      case "scene_sequence.generate":
+        setArtSceneResult(result);
+        setArtResult(null);
+        setSceneAnimationResult(null);
+        setActiveTab("art");
+        break;
+      case "scene_animation.generate":
+        setSceneAnimationResult(result);
+        setActiveTab("animation");
+        break;
+      case "video.generate":
+        setVideoResult(result);
+        setActiveTab("video");
+        break;
+      default:
+        console.warn("Unknown job type to import:", jobType);
+    }
   };
 
   const generatorWorkspace = (
-      <section className="tabs-shell">
-        <GeneratorTabs activeTab={activeTab} onChange={setActiveTab} />
-        {activeTab !== "captions" ? <div className="queue-control"><button type="button" disabled={queueLoading} onClick={() => queueProjectJob()}>{queueLoading?"Queueing…":`Queue ${activeTab === "scripts" ? "script" : activeTab === "voiceover" ? "voiceover" : activeTab === "music" ? "music" : activeTab === "art" ? "art" : activeTab === "animation" ? "animation" : "video"} job`}</button>{activeTab === "art" ? <button type="button" disabled={queueLoading} onClick={() => queueProjectJob("art-style/scenes")}>{queueLoading?"Queueing…":"Queue scene sequence job"}</button> : null}<p>Project jobs use the selected project, billing credits, quota checks, and appear in the dashboard.</p>{queueMessage ? <p className="message success">{queueMessage}</p> : null}{queueError ? <p className="message error">{queueError}</p> : null}</div> : <p className="helper-text">Caption rendering currently runs synchronously.</p>}
+    <div className="pipeline-shell">
+      <GeneratorTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        completedSteps={completedSteps}
+      />
 
+      <div className="pipeline-content">
         {activeTab === "scripts" ? (
           <ScriptGeneratorSection
             presets={scriptPresets}
@@ -757,6 +830,10 @@ export default function App() {
             onPresetSelect={applyScriptPreset}
             onFieldChange={updateScriptField}
             onSubmit={handleScriptSubmit}
+            onQueue={() => queueProjectJob()}
+            queueLoading={queueLoading}
+            queueMessage={queueMessage}
+            queueError={queueError}
           />
         ) : null}
 
@@ -779,6 +856,10 @@ export default function App() {
             onUseLatestScript={useLatestScriptForVoiceover}
             onFieldChange={updateVoiceField}
             onSubmit={handleVoiceSubmit}
+            onQueue={() => queueProjectJob()}
+            queueLoading={queueLoading}
+            queueMessage={queueMessage}
+            queueError={queueError}
           />
         ) : null}
 
@@ -796,6 +877,10 @@ export default function App() {
             onUseLatestScript={useLatestScriptForMusic}
             onFieldChange={updateMusicField}
             onSubmit={handleMusicSubmit}
+            onQueue={() => queueProjectJob()}
+            queueLoading={queueLoading}
+            queueMessage={queueMessage}
+            queueError={queueError}
           />
         ) : null}
 
@@ -816,6 +901,10 @@ export default function App() {
             onFieldChange={updateArtField}
             onSubmit={handleArtSubmit}
             onSceneSubmit={handleArtScenesSubmit}
+            onQueue={() => queueProjectJob()}
+            queueLoading={queueLoading}
+            queueMessage={queueMessage}
+            queueError={queueError}
           />
         ) : null}
 
@@ -846,6 +935,10 @@ export default function App() {
             sceneCount={artSceneResult?.scene_count || 0}
             onFieldChange={updateSceneAnimationField}
             onSubmit={handleSceneAnimationSubmit}
+            onQueue={() => queueProjectJob()}
+            queueLoading={queueLoading}
+            queueMessage={queueMessage}
+            queueError={queueError}
           />
         ) : null}
 
@@ -868,7 +961,13 @@ export default function App() {
             onSubmit={handleVideoSubmit}
           />
         ) : null}
-      </section>
+      </div>
+
+      <QueueMonitorDrawer
+        projectId={selectedProjectId}
+        onImportResult={handleImportQueueResult}
+      />
+    </div>
   );
 
   return (

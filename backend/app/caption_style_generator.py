@@ -33,6 +33,7 @@ class CaptionStyleRequest(BaseModel):
     language_hint: str = Field(default="", max_length=20)
     style_name: str = Field(default="Minimalist", max_length=80)
     output_basename: str = Field(default="", max_length=120)
+    whisper_prompt: str = Field(default="", max_length=8000)
 
 
 class CaptionStyleResponse(BaseModel):
@@ -85,6 +86,9 @@ def _build_command(request: CaptionStyleRequest, output_path: Path) -> list[str]
 
     if request.language_hint.strip():
         command.extend(["--lang", request.language_hint.strip()])
+
+    if request.whisper_prompt.strip():
+        command.extend(["--whisper-prompt", request.whisper_prompt.strip()])
 
     return command
 

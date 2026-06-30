@@ -1,3 +1,4 @@
+import ProjectActionCard from "./ProjectActionCard";
 import SectionHeading from "./SectionHeading";
 import VoiceStylePicker from "./VoiceStylePicker";
 
@@ -19,6 +20,10 @@ export default function VoiceoverGeneratorSection({
   onUseLatestScript,
   onFieldChange,
   onSubmit,
+  onQueue,
+  queueLoading,
+  queueMessage,
+  queueError,
 }) {
   const isGemini = form.model === geminiModel;
 
@@ -57,7 +62,7 @@ export default function VoiceoverGeneratorSection({
             onClick={onUseLatestScript}
             disabled={!hasScriptText}
           >
-            Use latest script
+            ↑ Pull latest script
           </button>
 
           <label>
@@ -110,27 +115,22 @@ export default function VoiceoverGeneratorSection({
                   ))}
                 </select>
               </label>
-
               <label>
                 Style Name
                 <input name="style_name" value={form.style_name} onChange={onFieldChange} required />
               </label>
-
               <label>
                 Voice ID
                 <input name="voice_id" value={form.voice_id} onChange={onFieldChange} required />
               </label>
-
               <label>
                 Similarity
                 <input name="similarity" type="number" min="0" max="1" step="0.01" value={form.similarity} onChange={onFieldChange} required />
               </label>
-
               <label>
                 Stability
                 <input name="stability" type="number" min="0" max="1" step="0.01" value={form.stability} onChange={onFieldChange} required />
               </label>
-
               <label className="checkbox-label">
                 <input name="use_speaker_boost" type="checkbox" checked={form.use_speaker_boost} onChange={onFieldChange} />
                 <span>Use Speaker Boost</span>
@@ -139,10 +139,18 @@ export default function VoiceoverGeneratorSection({
           )}
 
           <button type="submit" disabled={loading}>
-            {loading ? "Generating..." : "Generate voiceover"}
+            {loading ? "Generating…" : "Generate voiceover"}
           </button>
 
           {error ? <p className="message error">{error}</p> : null}
+
+          <ProjectActionCard
+            label="Save voiceover job to project"
+            onQueue={onQueue}
+            loading={queueLoading}
+            message={queueMessage}
+            error={queueError}
+          />
         </form>
 
         <section className="panel result-panel voice-panel">

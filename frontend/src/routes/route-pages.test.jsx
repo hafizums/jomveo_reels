@@ -5,6 +5,7 @@ import JobDetailPage from "./JobDetailPage";
 import { backend } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
+  adminKey: "mock-admin-key",
   backend: {
     job: vi.fn(),
     jobAssets: vi.fn(),

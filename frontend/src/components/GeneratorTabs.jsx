@@ -1,69 +1,44 @@
-export default function GeneratorTabs({ activeTab, onChange }) {
+// Pipeline step definitions — order defines the recommended workflow
+const STEPS = [
+  { id: "scripts",   num: 1, label: "Script",         hint: "Write your story" },
+  { id: "voiceover", num: 2, label: "Voiceover",      hint: "Narrate the script" },
+  { id: "art",       num: 3, label: "Art Style",       hint: "Generate visuals" },
+  { id: "animation", num: 4, label: "Animate Scenes",  hint: "Add motion" },
+  { id: "music",     num: 5, label: "Background Music", hint: "Set the mood" },
+  { id: "video",     num: 6, label: "Video Creator",   hint: "Assemble the video" },
+  // divider before utility
+  { id: "captions",  num: 7, label: "Caption Style",   hint: "Burn-in captions", utility: true },
+];
+
+export default function GeneratorTabs({ activeTab, onChange, completedSteps = {} }) {
   return (
-    <div className="tabs" role="tablist" aria-label="Generator tabs">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "scripts"}
-        className={`tab-button ${activeTab === "scripts" ? "is-active" : ""}`}
-        onClick={() => onChange("scripts")}
-      >
-        60-Second Scripts
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "captions"}
-        className={`tab-button ${activeTab === "captions" ? "is-active" : ""}`}
-        onClick={() => onChange("captions")}
-      >
-        Caption Style
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "art"}
-        className={`tab-button ${activeTab === "art" ? "is-active" : ""}`}
-        onClick={() => onChange("art")}
-      >
-        Art Style
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "animation"}
-        className={`tab-button ${activeTab === "animation" ? "is-active" : ""}`}
-        onClick={() => onChange("animation")}
-      >
-        Animate Scenes
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "music"}
-        className={`tab-button ${activeTab === "music" ? "is-active" : ""}`}
-        onClick={() => onChange("music")}
-      >
-        Background Music
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "voiceover"}
-        className={`tab-button ${activeTab === "voiceover" ? "is-active" : ""}`}
-        onClick={() => onChange("voiceover")}
-      >
-        Voiceover
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === "video"}
-        className={`tab-button ${activeTab === "video" ? "is-active" : ""}`}
-        onClick={() => onChange("video")}
-      >
-        Video Creator
-      </button>
-    </div>
+    <nav className="pipeline" aria-label="Generation pipeline">
+      <span className="pipeline-label">Pipeline</span>
+
+      {STEPS.map((step, i) => {
+        const isDivider = step.utility && i > 0;
+        const isDone = Boolean(completedSteps[step.id]);
+        const isActive = activeTab === step.id;
+
+        return (
+          <div key={step.id}>
+            {isDivider ? <div className="pipeline-divider" /> : null}
+            <button
+              type="button"
+              className={`pipeline-step${isActive ? " is-active" : ""}${isDone ? " is-done" : ""}`}
+              onClick={() => onChange(step.id)}
+              aria-current={isActive ? "step" : undefined}
+              title={step.hint}
+            >
+              <span className="step-num">{step.num}</span>
+              <span className="step-info">
+                <span className="step-name">{step.label}</span>
+                {isDone ? <span className="step-done-badge" /> : null}
+              </span>
+            </button>
+          </div>
+        );
+      })}
+    </nav>
   );
 }

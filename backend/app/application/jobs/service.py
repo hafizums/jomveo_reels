@@ -48,11 +48,13 @@ def job_to_detail(job: GenerationJob) -> JobDetailResponse:
         next_retry_at=job.next_retry_at,
         result=job.result_json,
         error=error,
+        input_payload=job.input_json,
         created_at=job.created_at,
         updated_at=job.updated_at,
         started_at=job.started_at,
         completed_at=job.completed_at,
     )
+
 
 
 def job_to_accepted(job: GenerationJob, api_prefix: str) -> JobAcceptedResponse:
