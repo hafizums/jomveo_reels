@@ -1,0 +1,1 @@
+export default function TransactionHistory({ transactions }) { return <article className="dashboard-card"><h3>Transactions</h3>{transactions.slice(0,4).map(tx=><p key={tx.id}>{tx.type} · {tx.amount_credits} credits</p>)}</article>; }

@@ -1,0 +1,1 @@
+export default function QuotaSummaryCard({ usage, quotas }) { return <article className="dashboard-card"><h3>Quota usage</h3>{usage&&quotas?<><p>{usage.daily_jobs} / {quotas.daily_job_limit??"∞"} daily jobs</p><p>{usage.monthly_jobs} / {quotas.monthly_job_limit??"∞"} monthly jobs</p><small>Max concurrent: {quotas.max_concurrent_jobs??"Unlimited"}</small></>:null}</article>; }

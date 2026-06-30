@@ -1,0 +1,1 @@
+export default function AdminTopUpForm({ amount, onAmountChange, onSubmit }) { return <form className="inline-form" onSubmit={onSubmit}><input aria-label="Top-up amount" type="number" min="1" value={amount} onChange={event=>onAmountChange(event.target.value)}/><button>Admin top-up</button></form>; }
