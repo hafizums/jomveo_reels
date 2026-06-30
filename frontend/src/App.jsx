@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import GeneratorTabs from "./components/GeneratorTabs";
-import Dashboard from "./components/Dashboard";
 import CaptionStyleSection from "./components/CaptionStyleSection";
-import HeroSection from "./components/HeroSection";
 import ArtStyleSection from "./components/ArtStyleSection";
 import BackgroundMusicSection from "./components/BackgroundMusicSection";
 import ScriptGeneratorSection from "./components/ScriptGeneratorSection";
@@ -12,6 +11,15 @@ import VideoGeneratorSection from "./components/VideoGeneratorSection";
 import SceneAnimationSection from "./components/SceneAnimationSection";
 import { backend, defaultProjectId } from "./lib/api";
 import { resolveQueueConfiguration } from "./lib/jobPayloads";
+import AppShell from "./routes/AppShell";
+import AssetsPage from "./routes/AssetsPage";
+import BillingPage from "./routes/BillingPage";
+import DashboardPage from "./routes/DashboardPage";
+import GeneratePage from "./routes/GeneratePage";
+import JobDetailPage from "./routes/JobDetailPage";
+import NotFoundPage from "./routes/NotFoundPage";
+import ProjectJobsPage from "./routes/ProjectJobsPage";
+import ProjectPage from "./routes/ProjectPage";
 import {
   artStylePresets,
   defaultArtStylePreset,
@@ -163,6 +171,13 @@ export default function App() {
   const [videoResult, setVideoResult] = useState(null);
   const [videoError, setVideoError] = useState("");
   const [videoLoading, setVideoLoading] = useState(false);
+
+  const selectProject = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+    if (projectId) {
+      localStorage.setItem("jomveo.selectedProjectId", projectId);
+    }
+  }, []);
 
   const selectedPreset =
     scriptPresets.find((preset) => preset.id === selectedPresetId) ?? defaultScriptPreset;
@@ -694,11 +709,7 @@ export default function App() {
     } catch (error) { setQueueError(error.message); } finally { setQueueLoading(false); }
   };
 
-  return (
-    <main className="page">
-      <HeroSection />
-      <Dashboard projectId={selectedProjectId} onProjectChange={setSelectedProjectId} refreshToken={dashboardRefresh} />
-
+  const generatorWorkspace = (
       <section className="tabs-shell">
         <GeneratorTabs activeTab={activeTab} onChange={setActiveTab} />
         {activeTab !== "captions" ? <div className="queue-control"><button type="button" disabled={queueLoading} onClick={() => queueProjectJob()}>{queueLoading?"Queueing…":`Queue ${activeTab === "scripts" ? "script" : activeTab === "voiceover" ? "voiceover" : activeTab === "music" ? "music" : activeTab === "art" ? "art" : activeTab === "animation" ? "animation" : "video"} job`}</button>{activeTab === "art" ? <button type="button" disabled={queueLoading} onClick={() => queueProjectJob("art-style/scenes")}>{queueLoading?"Queueing…":"Queue scene sequence job"}</button> : null}<p>Project jobs use the selected project, billing credits, quota checks, and appear in the dashboard.</p>{queueMessage ? <p className="message success">{queueMessage}</p> : null}{queueError ? <p className="message error">{queueError}</p> : null}</div> : <p className="helper-text">Caption rendering currently runs synchronously.</p>}
@@ -830,6 +841,22 @@ export default function App() {
           />
         ) : null}
       </section>
-    </main>
+  );
+
+  return (
+    <AppShell selectedProjectId={selectedProjectId}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/workspace" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage projectId={selectedProjectId} onProjectChange={selectProject} refreshToken={dashboardRefresh} />} />
+        <Route path="/generate" element={<GeneratePage>{generatorWorkspace}</GeneratePage>} />
+        <Route path="/projects/:projectId" element={<ProjectPage onProjectChange={selectProject} refreshToken={dashboardRefresh} />} />
+        <Route path="/projects/:projectId/jobs" element={<ProjectJobsPage onProjectChange={selectProject} />} />
+        <Route path="/projects/:projectId/assets" element={<AssetsPage onProjectChange={selectProject} />} />
+        <Route path="/projects/:projectId/billing" element={<BillingPage onProjectChange={selectProject} />} />
+        <Route path="/jobs/:jobId" element={<JobDetailPage selectedProjectId={selectedProjectId} />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </AppShell>
   );
 }
