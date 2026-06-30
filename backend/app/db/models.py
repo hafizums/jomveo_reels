@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base
@@ -271,5 +271,37 @@ class RateLimitEvent(Base):
     window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     window_seconds: Mapped[int] = mapped_column(Integer)
     count: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    provider_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("provider_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    asset_type: Mapped[str] = mapped_column(String(20))
+    provider: Mapped[str] = mapped_column(String(50))
+    storage_type: Mapped[str] = mapped_column(String(30))
+    url: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="available", index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    download_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

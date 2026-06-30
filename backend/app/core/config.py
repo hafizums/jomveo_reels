@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     default_monthly_credit_limit: int | None = None
     default_max_concurrent_jobs: int | None = 3
     pricing_version: str = "2026-06-30"
+    provider_asset_retention_days: int = 7
+    provider_asset_expiring_soon_hours: int = 24
+    asset_download_warning_enabled: bool = True
     wavespeed_api_key: str = ""
     wavespeed_llm_base_url: str = "https://llm.wavespeed.ai/v1"
     wavespeed_api_base_url: str = "https://api.wavespeed.ai/api/v3"

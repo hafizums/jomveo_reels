@@ -363,6 +363,20 @@ written to the safe audit log. Future billing milestones should add real provide
 sync, payment gateways such as Stripe/Billplz/ToyyibPay, invoices, and a project billing
 dashboard.
 
+## Temporary provider assets
+
+WaveSpeed-generated files remain hosted by the provider for the MVP and may expire after
+the configured retention window. Availability is not guaranteed. Generated files are
+temporarily hosted by the provider; please download them before the link expires.
+
+Asset metadata is available from `GET /api/projects/{project_id}/assets`,
+`GET /api/projects/{project_id}/assets/{asset_id}`, and `GET /api/jobs/{job_id}/assets`.
+Statuses are `available`, `expiring_soon`, or `expired`. Configure the assumed window with
+`PROVIDER_ASSET_RETENTION_DAYS` and the warning threshold with
+`PROVIDER_ASSET_EXPIRING_SOON_HOURS`. The backend stores URLs and safe metadata only: it
+does not download, proxy, or durably store provider output. S3/R2/CDN storage is
+intentionally deferred to a future milestone.
+
 ## WaveSpeed provider integration
 
 Model inference uses the official
