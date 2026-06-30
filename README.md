@@ -397,9 +397,11 @@ forms remain available beneath the workspace dashboard.
 
 ## Frontend baseline tests
 
-Run `cd frontend` followed by `npm run test:e2e`. The Playwright suite mocks backend
-APIs and characterizes the current dashboard, project persistence, job headers/details,
-asset warnings, and legacy generator tabs before future frontend refactors.
+Run `cd frontend`, then `npm run test` for Vitest unit/component coverage and
+`npm run test:e2e` for Playwright browser characterization. Vitest covers API/header
+helpers, persistent job payload builders, and focused dashboard components. Playwright
+mocks backend APIs and protects dashboard behavior, project persistence, job
+headers/details, asset warnings, and legacy generator tabs before future refactors.
 
 Every supported JSON generator also has a secondary project-job control. These controls
 reuse the selected dashboard project, send `X-Project-ID` and an idempotency key, refresh

@@ -1,0 +1,2 @@
+const usd=value=>`$${(value/100).toFixed(2)}`;
+export default function BillingSummaryCard({ billing }) { return <article className="dashboard-card"><h3>Internal credits</h3>{billing ? <><strong className="metric">{billing.available_credits}</strong><p>Available · {usd(billing.available_credits)} internal value</p><small>{billing.balance_credits} balance · {billing.reserved_credits} reserved · {billing.lifetime_used_credits} used</small></>:null}</article>; }

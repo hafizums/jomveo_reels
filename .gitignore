@@ -6,6 +6,7 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.playwright/
+frontend/coverage/
 
 # Python cache / build artifacts
 __pycache__/

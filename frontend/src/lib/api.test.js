@@ -1,0 +1,3 @@
+import { buildHeaders, friendlyError, jobRoute } from "./api";
+test("builds scoped user and admin headers",()=>{expect(buildHeaders({body:{},projectId:"p1",idempotencyKey:"i1",userApiKey:"u",admin:true,adminApiKey:"a"})).toEqual({"Content-Type":"application/json","X-User-API-Key":"u","X-Admin-API-Key":"a","X-Project-ID":"p1","Idempotency-Key":"i1"});expect(buildHeaders({admin:false,adminApiKey:"a"})["X-Admin-API-Key"]).toBeUndefined();});
+test("maps errors and nested job routes",()=>{expect(friendlyError({code:"insufficient_credits"})).toMatch(/enough credits/);expect(friendlyError({code:"quota_exceeded"})).toMatch(/quota/);expect(jobRoute("art-style/scenes")).toBe("/api/jobs/art-style/scenes/generate");});

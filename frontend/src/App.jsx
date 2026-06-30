@@ -11,6 +11,7 @@ import VoiceoverGeneratorSection from "./components/VoiceoverGeneratorSection";
 import VideoGeneratorSection from "./components/VideoGeneratorSection";
 import SceneAnimationSection from "./components/SceneAnimationSection";
 import { backend, defaultProjectId } from "./lib/api";
+import { resolveQueueConfiguration } from "./lib/jobPayloads";
 import {
   artStylePresets,
   defaultArtStylePreset,
@@ -672,19 +673,7 @@ export default function App() {
   };
 
   const queueConfiguration = (requestedKind) => {
-    if (activeTab === "scripts") return ["scripts", scriptForm, "script"];
-    if (activeTab === "voiceover") {
-      if (!voiceForm.text.trim()) return null;
-      return ["voiceovers", voiceForm, "voiceover"];
-    }
-    if (activeTab === "music") return ["background-music", musicForm, "music"];
-    if (activeTab === "art") {
-      if (requestedKind === "art-style/scenes") return scriptResult?.script ? ["art-style/scenes", { script: scriptResult.script, title: scriptResult.title, event_name: scriptResult.event_name, duration_seconds: scriptResult.duration_seconds, planner_model: "openai/gpt-5.4-mini", style_name: artForm.style_name, art_direction: artForm.art_direction, model: artForm.model, enable_safety_checker: artForm.enable_safety_checker }, "scene sequence"] : null;
-      return ["art-style", artForm, "art"];
-    }
-    if (activeTab === "animation" && artSceneResult?.scenes?.length) return ["scene-animations", { duration: sceneAnimationForm.duration, negative_prompt: sceneAnimationForm.negative_prompt, model: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast", scenes: artSceneResult.scenes.map(scene => ({ scene_number: scene.scene_number, image_url: scene.image_url, motion_prompt: scene.motion_prompt })) }, "animation"];
-    if (activeTab === "video" && artSceneResult?.scenes?.length && voiceResult?.audio_url) return ["videos", { title: scriptResult?.title || "Generated video", duration_seconds: videoForm.duration_seconds, aspect_ratio: videoForm.aspect_ratio, visual_source: videoForm.visual_source, image_urls: artSceneResult.scenes.map(scene => scene.image_url), video_urls: sceneAnimationResult?.scenes?.map(scene => scene.video_url) || [], voiceover_url: voiceResult.audio_url, music_url: musicResult?.audio_urls?.[0] || "", music_volume: videoForm.music_volume, caption_template: (captionStylePresets.find(preset => preset.id === videoForm.caption_style_id) ?? defaultCaptionStylePreset).templateName, caption_style_name: (captionStylePresets.find(preset => preset.id === videoForm.caption_style_id) ?? defaultCaptionStylePreset).title, language_hint: scriptResult?.language === "Malay" ? "ms" : "en" }, "video"];
-    return null;
+    return resolveQueueConfiguration({activeTab,requestedKind,scriptForm,voiceForm,musicForm,artForm,scriptResult,artSceneResult,sceneAnimationForm,sceneAnimationResult,voiceResult,musicResult,videoForm,captionStylePresets,defaultCaptionStylePreset});
   };
 
   const queueProjectJob = async (requestedKind) => {
