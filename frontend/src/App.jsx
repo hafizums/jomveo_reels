@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import GeneratorTabs from "./components/GeneratorTabs";
+import Dashboard from "./components/Dashboard";
 import CaptionStyleSection from "./components/CaptionStyleSection";
 import HeroSection from "./components/HeroSection";
 import ArtStyleSection from "./components/ArtStyleSection";
@@ -666,6 +667,13 @@ export default function App() {
   return (
     <main className="page">
       <HeroSection />
+      <Dashboard
+        jobDrafts={{
+          scripts: scriptForm,
+          "art-style": artForm,
+          "background-music": musicForm,
+        }}
+      />
 
       <section className="tabs-shell">
         <GeneratorTabs activeTab={activeTab} onChange={setActiveTab} />
