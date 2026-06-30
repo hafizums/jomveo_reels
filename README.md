@@ -377,6 +377,24 @@ Statuses are `available`, `expiring_soon`, or `expired`. Configure the assumed w
 does not download, proxy, or durably store provider output. S3/R2/CDN storage is
 intentionally deferred to a future milestone.
 
+## Frontend workspace dashboard
+
+The frontend now exposes project selection/creation, project jobs and status polling,
+billing balances and quota usage, transaction history, and temporary asset warnings.
+Copy `frontend/.env.example` to `frontend/.env` and configure:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_USER_API_KEY=
+VITE_ADMIN_API_KEY=
+VITE_DEFAULT_PROJECT_ID=
+```
+
+Without a user key, the frontend relies on backend demo mode. The selected project is
+stored under `jomveo.selectedProjectId`. A configured admin key reveals the local manual
+top-up form; payments and invoices are not implemented. Existing synchronous generator
+forms remain available beneath the workspace dashboard.
+
 ## WaveSpeed provider integration
 
 Model inference uses the official
