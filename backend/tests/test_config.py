@@ -20,6 +20,9 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.default_monthly_job_limit == 1000
     assert settings.default_max_concurrent_jobs == 3
     assert settings.pricing_version == "2026-06-30"
+    assert settings.provider_asset_retention_days == 7
+    assert settings.provider_asset_expiring_soon_hours == 24
+    assert settings.asset_download_warning_enabled is True
     assert isinstance(settings.generated_root, Path)
     assert "http://localhost:5173" in settings.cors_allowed_origins
     assert settings.database_url == "sqlite:///backend/generated/jomveo.db"

@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from backend.app.application.assets.service import AssetService
 from backend.app.application.billing.service import BillingService
 from backend.app.application.jobs.registry import get_job_definition
 from backend.app.core.config import Settings, get_settings
@@ -158,6 +159,7 @@ def execute_job(
                     provider_run,
                     safe_provider_response_summary(result),
                 )
+            AssetService(session, settings).register(job, provider_run, result)
             session.commit()
     except AppError as exc:
         _record_failure(session_factory, settings, job_id, provider_run_id, exc.code, exc.message)

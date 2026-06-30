@@ -17,6 +17,9 @@ SAFE_METADATA_KEYS = {
     "reserved_credits",
     "billing_status",
     "quota_key",
+    "asset_type",
+    "storage_type",
+    "expires_at",
 }
 
 

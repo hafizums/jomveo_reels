@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from backend.app.api.v1 import (
     art_style,
+    assets,
     audit,
     billing,
     captions,
@@ -19,6 +20,7 @@ from backend.app.api.v1 import (
 
 router = APIRouter()
 router.include_router(audit.router, prefix="/audit", tags=["audit"])
+router.include_router(assets.router, tags=["assets"])
 router.include_router(billing.router, prefix="/projects", tags=["billing"])
 router.include_router(health.router, tags=["health"])
 router.include_router(identity.router, tags=["identity"])
