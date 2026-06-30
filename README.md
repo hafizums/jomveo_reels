@@ -395,6 +395,15 @@ stored under `jomveo.selectedProjectId`. A configured admin key reveals the loca
 top-up form; payments and invoices are not implemented. Existing synchronous generator
 forms remain available beneath the workspace dashboard.
 
+## Housekeeping audit
+
+Run `python -m backend.app.housekeeping.outdated_info_audit` for a read-only Markdown
+report covering route documentation, environment examples, frontend API usage,
+provider/model/pricing and retention assumptions, maintenance markers, dates, milestone
+references, README sections, and tracked generated artifacts. JSON is available with
+`--format json`. Use `--fail-on high` in CI to reject serious documentation or
+configuration drift. The command never rewrites files or contacts external services.
+
 ## WaveSpeed provider integration
 
 Model inference uses the official
