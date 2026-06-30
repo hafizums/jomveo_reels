@@ -1,1 +1,2 @@
-export default function TransactionHistory({ transactions }) { return <article className="dashboard-card"><h3>Transactions</h3>{transactions.slice(0,4).map(tx=><p key={tx.id}>{tx.type} · {tx.amount_credits} credits</p>)}</article>; }
+import EmptyState from "../ui/EmptyState";
+export default function TransactionHistory({ transactions }) { return <article className="dashboard-card"><h3>Transactions</h3>{transactions.length?transactions.slice(0,4).map(tx=><p key={tx.id}>{tx.type} · {tx.amount_credits} credits</p>):<EmptyState title="No transactions yet" description="Credit reservations, releases, usage, and top-ups will appear here."/>}</article>; }

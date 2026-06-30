@@ -402,6 +402,8 @@ Run `cd frontend`, then `npm run test` for Vitest unit/component coverage and
 helpers, persistent job payload builders, and focused dashboard components. Playwright
 mocks backend APIs and protects dashboard behavior, project persistence, job
 headers/details, asset warnings, and legacy generator tabs before future refactors.
+The dashboard includes explicit loading, empty, warning, error, and submission states;
+Vitest checks these component states while Playwright covers browser and mobile regressions.
 
 Every supported JSON generator also has a secondary project-job control. These controls
 reuse the selected dashboard project, send `X-Project-ID` and an idempotency key, refresh
