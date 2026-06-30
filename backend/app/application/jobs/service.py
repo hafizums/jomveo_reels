@@ -11,12 +11,17 @@ from backend.app.application.jobs.schemas import (
     JobListResponse,
     JobRecoveryResponse,
 )
+from backend.app.application.projects.permissions import require_project_role
+from backend.app.auth.models import AuthenticatedPrincipal
 from backend.app.core.config import Settings
-from backend.app.core.errors import ValidationAppError
+from backend.app.core.errors import AuthForbiddenError, ValidationAppError
 from backend.app.db.models import GenerationJob
 from backend.app.db.session import SessionFactory
+from backend.app.repositories.audit_logs import AuditLogRepository
 from backend.app.repositories.jobs import JobRepository
+from backend.app.repositories.projects import ProjectRepository
 from backend.app.repositories.provider_runs import ProviderRunRepository
+from backend.app.repositories.users import UserRepository
 
 
 def job_to_detail(job: GenerationJob) -> JobDetailResponse:
@@ -69,6 +74,8 @@ class JobService:
         job_type: str,
         payload: BaseModel,
         idempotency_key: str | None,
+        principal: AuthenticatedPrincipal,
+        project_id: str | None = None,
     ) -> JobAcceptedResponse:
         normalized_key = idempotency_key.strip() if idempotency_key else None
         if normalized_key and len(normalized_key) > 255:
@@ -76,9 +83,27 @@ class JobService:
 
         with self.session_factory() as session:
             repository = JobRepository(session)
+            resolved_project_id = project_id
+            if resolved_project_id is not None:
+                projects = ProjectRepository(session)
+                projects.get_or_raise(resolved_project_id)
+                require_project_role(
+                    principal,
+                    projects.membership(resolved_project_id, principal.user_id),
+                    "editor",
+                )
+            elif (
+                self.settings.demo_user_enabled
+                and principal.email == self.settings.demo_user_email.casefold()
+            ):
+                _user, demo_project = UserRepository(session).ensure_demo(
+                    self.settings.demo_user_email
+                )
+                resolved_project_id = demo_project.id
             if normalized_key:
                 existing = repository.find_by_idempotency_key(job_type, normalized_key)
                 if existing:
+                    self._require_job_access(session, existing, principal)
                     return job_to_accepted(existing, self.settings.api_v1_prefix)
             try:
                 job = repository.create(
@@ -86,6 +111,16 @@ class JobService:
                     payload.model_dump(mode="json"),
                     self.settings.job_max_attempts,
                     normalized_key,
+                    resolved_project_id,
+                    principal.user_id,
+                )
+                AuditLogRepository(session).record(
+                    principal,
+                    "job_created",
+                    "generation_job",
+                    job.id,
+                    resolved_project_id,
+                    {"job_type": job_type},
                 )
                 session.commit()
             except IntegrityError:
@@ -95,22 +130,37 @@ class JobService:
                 existing = repository.find_by_idempotency_key(job_type, normalized_key)
                 if existing is None:
                     raise
+                self._require_job_access(session, existing, principal)
                 return job_to_accepted(existing, self.settings.api_v1_prefix)
             accepted = job_to_accepted(job, self.settings.api_v1_prefix)
 
         self.queue.enqueue(job.id)
         return accepted
 
-    def get_job(self, job_id: str) -> JobDetailResponse:
+    def get_job(self, job_id: str, principal: AuthenticatedPrincipal) -> JobDetailResponse:
         with self.session_factory() as session:
-            return job_to_detail(JobRepository(session).get_or_raise(job_id))
+            job = JobRepository(session).get_or_raise(job_id)
+            self._require_job_access(session, job, principal)
+            return job_to_detail(job)
 
-    def list_jobs(self, limit: int) -> JobListResponse:
+    def list_jobs(self, limit: int, principal: AuthenticatedPrincipal) -> JobListResponse:
         with self.session_factory() as session:
-            jobs = [job_to_detail(job) for job in JobRepository(session).list_recent(limit)]
+            repository = JobRepository(session)
+            if principal.role == "admin":
+                records = repository.list_recent(limit)
+            else:
+                records = repository.list_for_user(
+                    principal.user_id or "",
+                    limit,
+                    include_unowned=(
+                        self.settings.demo_user_enabled
+                        and principal.email == self.settings.demo_user_email.casefold()
+                    ),
+                )
+            jobs = [job_to_detail(job) for job in records]
         return JobListResponse(jobs=jobs, count=len(jobs))
 
-    def cancel_job(self, job_id: str) -> JobCancellationResponse:
+    def cancel_job(self, job_id: str, principal: AuthenticatedPrincipal) -> JobCancellationResponse:
         with self.session_factory() as session:
             repository = JobRepository(session)
             job = repository.get_or_raise(job_id)
@@ -120,15 +170,45 @@ class JobService:
             provider_run_repository = ProviderRunRepository(session)
             for provider_run in provider_run_repository.list_running_for_job(job.id):
                 provider_run_repository.mark_cancelled(provider_run)
+            AuditLogRepository(session).record(
+                principal, "job_cancelled", "generation_job", job.id, job.project_id
+            )
             session.commit()
             return JobCancellationResponse(job_id=job.id, status="cancelled")
 
-    def recover_jobs(self) -> JobRecoveryResponse:
+    def recover_jobs(self, principal: AuthenticatedPrincipal) -> JobRecoveryResponse:
         recovered_stale = recover_stale_jobs(self.session_factory, self.settings)
         due_job_ids = requeue_due_jobs(self.session_factory)
         for job_id in due_job_ids:
             self.queue.enqueue(job_id)
+        with self.session_factory() as session:
+            AuditLogRepository(session).record(
+                principal,
+                "job_recovered_stale",
+                "generation_job",
+                metadata={"count": recovered_stale + len(due_job_ids)},
+            )
+            session.commit()
         return JobRecoveryResponse(
             recovered_stale=recovered_stale,
             requeued_due=len(due_job_ids),
         )
+
+    def _require_job_access(
+        self,
+        session,
+        job: GenerationJob,
+        principal: AuthenticatedPrincipal,
+    ) -> None:
+        if principal.role == "admin" or job.created_by_user_id == principal.user_id:
+            return
+        if job.project_id is not None:
+            membership = ProjectRepository(session).membership(job.project_id, principal.user_id)
+            require_project_role(principal, membership, "viewer")
+            return
+        if (
+            self.settings.demo_user_enabled
+            and principal.email == self.settings.demo_user_email.casefold()
+        ):
+            return
+        raise AuthForbiddenError("You do not have permission to access this job.")

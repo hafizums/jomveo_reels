@@ -198,6 +198,8 @@ def test_job_input_and_provider_summary_do_not_store_api_key(job_app) -> None:
         for job in jobs:
             assert "api_key" not in job.input_json
             assert "worker-only-secret" not in str(job.input_json)
+            assert job.project_id is not None
+            assert job.created_by_user_id is not None
         provider_runs = list(
             session.scalars(select(ProviderRun).where(ProviderRun.job_id.in_(created_ids)))
         )

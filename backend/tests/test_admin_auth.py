@@ -136,6 +136,27 @@ def test_production_rejects_enabled_admin_auth_without_keys(tmp_path) -> None:
         create_app(settings)
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"admin_auth_enabled": False, "admin_api_keys": []},
+        {"admin_auth_enabled": True, "admin_api_keys": ["change-me-dev-admin-key"]},
+    ],
+)
+def test_production_rejects_unsafe_admin_configuration(tmp_path, overrides) -> None:
+    settings = Settings(
+        _env_file=None,
+        app_env="production",
+        generated_root=tmp_path / "generated",
+        local_storage_root=tmp_path / "generated",
+        database_url=f"sqlite:///{(tmp_path / 'unsafe.db').as_posix()}",
+        **overrides,
+    )
+
+    with pytest.raises(ConfigurationError):
+        create_app(settings)
+
+
 def test_admin_key_comparison_uses_constant_time_helper(monkeypatch) -> None:
     compared = []
 

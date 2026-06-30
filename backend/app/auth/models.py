@@ -5,4 +5,6 @@ from pydantic import BaseModel
 
 class AuthenticatedPrincipal(BaseModel):
     subject: str
-    role: Literal["admin"] = "admin"
+    role: Literal["admin", "user"] = "admin"
+    user_id: str | None = None
+    email: str | None = None

@@ -10,6 +10,9 @@ def test_settings_have_local_development_defaults() -> None:
     assert settings.api_v1_prefix == "/api"
     assert settings.admin_auth_enabled is True
     assert settings.admin_api_keys == []
+    assert settings.user_auth_enabled is False
+    assert settings.demo_user_enabled is True
+    assert settings.demo_user_email == "demo@jomveo.local"
     assert isinstance(settings.generated_root, Path)
     assert "http://localhost:5173" in settings.cors_allowed_origins
     assert settings.database_url == "sqlite:///backend/generated/jomveo.db"
