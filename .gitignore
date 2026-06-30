@@ -3,6 +3,9 @@ backend/.env
 backend/generated/
 frontend/node_modules/
 frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/
 
 # Python cache / build artifacts
 __pycache__/
